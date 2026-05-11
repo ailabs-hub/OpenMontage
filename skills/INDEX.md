@@ -270,6 +270,26 @@ Stage director skills teach the agent HOW to execute each pipeline stage. Each s
 | Compose Director | `pipelines/localization-dub/compose-director.md` | `compose` | Per-locale rendering, subtitle-fit checks, output labeling |
 | Publish Director | `pipelines/localization-dub/publish-director.md` | `publish` | Locale packaging, metadata precision, QA-note retention |
 
+### Marketing Creative Pipeline (`pipelines/marketing-creative/`)
+
+Static marketing creative production: signal research, creative concepting, copy variants (5 angles × 3 languages), image asset generation with Visual Brief pattern and language propagation enforcement.
+
+| Skill | File | Stage | Key Capabilities |
+|-------|------|-------|-----------------|
+| **Executive Producer** | `pipelines/marketing-creative/executive-producer.md` | `all` | **Orchestration, stage routing, approval gates, budget governance** |
+| **Research Director** | `pipelines/marketing-creative/research-director.md` | `research` | Signal discovery, competitor mapping, idea scoring |
+| **Creative Director** | `pipelines/marketing-creative/creative-director.md` | `creative_concept` | Angle/hook definition, mood-driven visual direction |
+| **Copy Director** | `pipelines/marketing-creative/copy-director.md` | `copy` | 5-angle × 3-language variant generation, Hinglish naturalness |
+| **Asset Director** | `pipelines/marketing-creative/asset-director.md` | `assets` | Visual Brief prompt crafting, image generation, language lock |
+| **Review Director** | `pipelines/marketing-creative/review-director.md` | `review` | Quality gates, A/B test plan, language propagation verification |
+
+**Orchestrator (Layer 3):** `.agents/skills/marketing-creative-orchestrator/SKILL.md` — entry point for fresh-window invocation, idea discussion, subagent spawning, and output steering.
+
+**Meta skills used:**
+- `meta/image-prompt-from-copy-variant.md` — Visual Brief pattern (mandatory before any image prompt)
+- `meta/reviewer.md` — self-review after every stage
+- `meta/checkpoint-protocol.md` — human approval gates
+
 ## Meta Skills
 
 Cross-cutting skills that apply to all pipelines:
@@ -302,7 +322,7 @@ Claude Code accesses them via symlinks in `.claude/skills/`.
 |----------|-----------------|--------|
 | **Video Composition** | `remotion-best-practices`, `remotion`, `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `website-to-hyperframes` | `remotion-dev/skills`, `digitalsamba/claude-code-video-toolkit`, `heygen-com/hyperframes` |
 | **Video Processing** | `ffmpeg`, `video_toolkit` | `digitalsamba/claude-code-video-toolkit` |
-| **TTS & Audio** | `text-to-speech`, `speech-to-text`, `music`, `sound-effects`, `elevenlabs`, `agents`, `setup-api-key` | `elevenlabs/skills`, `digitalsamba/claude-code-video-toolkit` |
+| **TTS & Audio** | `text-to-speech`, `speech-to-text`, `music`, `sound-effects`, `elevenlabs`, `elevenlabs-agents`, `setup-api-key` | `elevenlabs/skills`, `digitalsamba/claude-code-video-toolkit` |
 | **Image Generation** | `flux-best-practices`, `bfl-api`, `grok-media` | `black-forest-labs/skills`, local OpenMontage skill |
 | **Math Animation** | `manimce-best-practices`, `manimgl-best-practices`, `manim-composer` | `adithya-s-k/manim_skill` |
 | **3D Graphics** | `threejs-animation`, `threejs-fundamentals`, `threejs-geometry`, `threejs-interaction`, `threejs-lighting`, `threejs-loaders`, `threejs-materials`, `threejs-postprocessing`, `threejs-shaders`, `threejs-textures` | `cloudai-x/threejs-skills` |
@@ -311,4 +331,5 @@ Claude Code accesses them via symlinks in `.claude/skills/`.
 | **Design** | `tailwind-design-system`, `web-design-guidelines`, `vercel-react-best-practices`, `vercel-composition-patterns` | `wshobson/agents`, `vercel-labs/agent-skills` |
 | **AI Video (HeyGen)** | `heygen`, `avatar-video`, `create-video`, `faceswap`, `ai-video-gen`, `video-download`, `video-edit`, `video-translate`, `video-understand`, `visual-style` | `heygen-com/skills` |
 | **AI Video (Premium)** | `seedance-2-0` — preferred premium default (cinematic, trailer, multi-shot, lip-sync, synced audio); accessed via `seedance_video` (fal.ai) or `heygen_video` Avatar Shots | Local OpenMontage skill |
+| **Marketing** | `marketing-creative-orchestrator` — entry-point orchestrator for static creative campaigns; spawns subagents per stage, enforces Visual Brief and language propagation | Local OpenMontage skill |
 | **Infrastructure** | `acestep`, `ltx2`, `playwright-recording` | `digitalsamba/claude-code-video-toolkit` |

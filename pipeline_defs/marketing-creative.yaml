@@ -1,0 +1,212 @@
+name: marketing-creative
+version: "1.0"
+description: >
+  Static marketing creative production pipeline: from signal analysis and idea scoring
+  through creative concepting, copy variant generation, and image asset production.
+  Optimized for multi-angle, multi-language ad campaigns configured per-company profile.
+  with built-in Visual Brief pattern for creativity preservation and language propagation.
+category: custom
+stability: beta
+
+default_checkpoint_policy: guided
+
+extensions:
+  custom_scripts: true
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/marketing-creative/executive-producer
+  - pipelines/marketing-creative/research-director
+  - pipelines/marketing-creative/creative-director
+  - pipelines/marketing-creative/copy-director
+  - pipelines/marketing-creative/asset-director
+  - pipelines/marketing-creative/review-director
+  - meta/image-prompt-from-copy-variant
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/marketing-creative/executive-producer
+  budget_default_usd: 5.00
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 30
+  max_campaigns_per_invocation: 2
+  context_budget_per_campaign: "35000 tokens"
+
+stages:
+  # ── Pre-Production ──────────────────────────────────────────────
+
+  - name: research
+    skill: pipelines/marketing-creative/research-director
+    produces:
+      - research_brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Signals are sourced from real platforms (YouTube, Reddit, news) not invented
+      - At least 3 distinct signals documented with evidence
+      - Audience pain points are specific and quotable
+      - Competitor landscape mapped with actual names and tactics
+      - Idea score is justified with weighted criteria
+    success_criteria:
+      - Schema-valid research_brief with at least 3 signals
+      - Each signal has a source_url or screenshot reference
+      - At least 2 competitor entries with specific tactics
+    gate:
+      gate_id: gate-00-research
+      required: true
+      validation_fields:
+        - research_brief_exists
+        - min_signals
+        - min_competitors
+
+  - name: creative_concept
+    skill: pipelines/marketing-creative/creative-director
+    required_artifacts_in:
+      - research_brief
+    produces:
+      - creative_specs
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Creative concepts are grounded in research findings
+      - Each creative has a distinct angle/hook (not 6 versions of the same idea)
+      - Format and placement match the target platform
+      - Budget guidance is specific (currency amount per day, not vague)
+      - Visual direction describes mood, not UI wireframes
+    success_criteria:
+      - At least 3 creative specs defined
+      - Each spec has unique hook and visual direction
+      - All specs reference insights from research_brief
+    gate:
+      gate_id: gate-01-creative
+      required: true
+      validation_fields:
+        - creative_specs_exists
+        - min_creatives
+        - distinct_angles
+        - visual_direction_is_mood
+
+  - name: copy
+    skill: pipelines/marketing-creative/copy-director
+    required_artifacts_in:
+      - creative_specs
+    produces:
+      - copy_manifest
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - 5 angles present per creative (pain_point, direct_benefit, emotional, comparison, offer_led)
+      - All configured languages present per angle (from company_context)
+      - Headlines are punchy and platform-appropriate
+      - Body copy matches the angle's strategic intent
+      - CTA is clear and action-oriented
+      - Code-switched / bilingual copy uses natural code-switching, not forced translation
+    success_criteria:
+      - Schema-valid copy_manifest with all creatives × angles × languages
+      - Each copy variant has at least 3 headline options
+      - Primary language variants pass naturalness check (not literal translation)
+    gate:
+      gate_id: gate-02-copy
+      required: true
+      validation_fields:
+        - copy_manifest_exists
+        - file_count_matches_manifest
+        - languages_present
+        - angles_present
+
+  # ── Production ──────────────────────────────────────────────────
+
+  - name: assets
+    skill: pipelines/marketing-creative/asset-director
+    required_artifacts_in:
+      - copy_manifest
+      - creative_specs
+    produces:
+      - asset_manifest
+    required_tools:
+      - image_selector
+    optional_tools:
+      - video_selector
+      - openai_image
+      - google_imagen
+      - gemini_image
+      - seedream_image
+    tools_available:
+      - image_selector
+      - video_selector
+      - openai_image
+      - google_imagen
+      - gemini_image
+      - seedream_image
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - "MANDATORY: meta skill image-prompt-from-copy-variant was read before any prompt was written"
+      - Image prompts use Visual Brief pattern (mood-driven, <400 tokens)
+      - Image text overlays match the copy variant language (copy language = image text language)
+      - No checklist/checkmark UI elements in generated images
+      - No specific fonts requested in prompts
+      - Emotional contrast is explicit in every prompt
+      - Asset versioning is clear (v1 deprecated, v2 active, etc.)
+      - Generation logs (.prompt.json) exist for every asset
+    success_criteria:
+      - Schema-valid asset_manifest with all required assets generated
+      - All file paths resolve to existing files
+      - Language propagation check passed for every asset
+      - Visual Brief check passed for every asset
+      - Total cost within approved budget
+    gate:
+      gate_id: gate-03-assets
+      required: true
+      validation_fields:
+        - asset_manifest_exists
+        - skill_reading_log_exists
+        - skills_read_count
+        - prompt_has_camera_technical
+        - prompt_has_shot_type
+        - prompt_has_lighting_pattern
+        - prompt_under_400_tokens
+        - files_generated
+
+  # ── Post-Production ─────────────────────────────────────────────
+
+  - name: review
+    skill: pipelines/marketing-creative/review-director
+    required_artifacts_in:
+      - asset_manifest
+      - copy_manifest
+      - creative_specs
+    produces:
+      - final_review
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Assets match creative spec emotional direction
+      - Language is correct across all variants (image text matches copy variant language)
+      - CTR benchmarks are referenced and realistic
+      - A/B test plan is defined (which variants to test against which)
+      - Budget summary is accurate
+      - Next steps are specific and actionable
+    success_criteria:
+      - Schema-valid final_review
+      - All critical issues from asset generation are addressed
+      - A/B test plan has at least 2 variant pairs defined
+      - User approval obtained before any campaign launch
+    gate:
+      gate_id: gate-04-review
+      required: true
+      validation_fields:
+        - final_review_exists
+        - file_existence_check_passed
+        - copy_variants_found
+        - assets_found
+        - ab_test_plan_has_2_pairs

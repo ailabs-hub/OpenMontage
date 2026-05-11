@@ -1,0 +1,83 @@
+name: provider-benchmark
+version: "1.0"
+description: >
+  Apples-to-apples benchmark harness for image and video generation providers.
+  Runs the same prompts across multiple providers/models with controlled parameters
+  (seed, resolution, aspect ratio, variations) and produces a structured asset_manifest
+  with full provenance (provider, model, seed, cost, generation time) for side-by-side
+  comparison. Intended for capability evaluation, prompt-engineering iteration, and
+  cost/quality calibration — NOT for shipping production deliverables.
+category: custom
+stability: beta
+default_checkpoint_policy: guided
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: false
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/provider-benchmark/plan-director
+  - pipelines/provider-benchmark/assets-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+stages:
+  - name: plan
+    skill: pipelines/provider-benchmark/plan-director
+    produces:
+      - benchmark_plan
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Each prompt is concrete, modality-tagged, and apples-to-apples comparable across providers
+      - Provider/model selection covers a meaningful spread (not all variants of one family)
+      - Per-call parameters (seed, resolution, aspect ratio, variations) are explicit and held constant where possible
+      - Cost estimate is itemized per (prompt x provider x variation) and summed
+      - VEO routing is explicitly addressed when the plan includes video generation
+    success_criteria:
+      - Schema-valid benchmark_plan artifact
+      - At least 1 prompt and at least 1 provider per modality represented
+      - Total estimated cost present and per-cell breakdown included
+
+  - name: assets
+    skill: pipelines/provider-benchmark/assets-director
+    required_artifacts_in:
+      - benchmark_plan
+    produces:
+      - asset_manifest
+    tools_available:
+      - image_selector
+      - video_selector
+      - flux_image
+      - google_imagen
+      - openai_image
+      - grok_image
+      - recraft_image
+      - pexels_image
+      - pixabay_image
+      - runway_video
+      - veo_video
+      - kling_video
+      - seedance_video
+      - grok_video
+      - minimax_video
+      - heygen_video
+      - ltx_video_modal
+      - pexels_video
+      - pixabay_video
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Every plan cell has a corresponding asset entry (or a recorded failure entry in metadata)
+      - asset_manifest entries include provider, model, seed (where supported), cost_usd, and prompt
+      - Direct provider tools were used for benchmark cells (selectors only used when explicitly chosen)
+      - Layer 3 skills (flux-best-practices, bfl-api, ai-video-gen, grok-media, ltx2) were read before each generation family
+      - Provider/model/reason was announced before each paid call per the Decision Communication Contract
+      - All asset files exist on disk and are referenced by relative path under the project workspace
+    success_criteria:
+      - Schema-valid asset_manifest artifact
+      - total_cost_usd populated and reconciles with per-asset cost_usd sum within 1 percent
+      - Failed cells documented in metadata.failed_cells with provider/model/reason

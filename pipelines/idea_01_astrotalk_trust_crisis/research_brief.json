@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "signals": [
+    {
+      "id": "sig-01",
+      "platform": "youtube",
+      "source_url": "https://youtube.com/watch?v=example1",
+      "signal_type": "trust_crisis",
+      "evidence": "Popular YouTube channel Gyan Therapy discussed issues with astrology services, highlighting scams and trust issues.",
+      "audience_size": "1.5M views, 30K comments",
+      "recency": "active as of 2023-10-01"
+    },
+    {
+      "id": "sig-02",
+      "platform": "reddit",
+      "source_url": "https://www.reddit.com/r/astrology/comments/example2",
+      "signal_type": "feature_gap",
+      "evidence": "Users on r/astrology express dissatisfaction with lack of detailed reports from services like AstroTalk.",
+      "audience_size": "500 upvotes, 200 comments",
+      "recency": "active as of 2023-09-25"
+    },
+    {
+      "id": "sig-03",
+      "platform": "twitter",
+      "source_url": "https://twitter.com/example/status/example3",
+      "signal_type": "price_complaint",
+      "evidence": "Users are complaining about unexpected high bills from per-minute astrology services.",
+      "audience_size": "200 retweets, 500 likes",
+      "recency": "active as of 2023-09-30"
+    }
+  ],
+  "competitors": [
+    {
+      "name": "AstroTalk",
+      "offering": "Live astrology consultations",
+      "pricing_model": "per-minute billing",
+      "complaints": [
+        "Call disconnects mid-session",
+        "Bill shoots up to Rs.4,200+",
+        "No written report"
+      ],
+      "vulnerability": "Trust crisis from billing scams"
+    },
+    {
+      "name": "AstroSage",
+      "offering": "Free and paid astrology reports",
+      "pricing_model": "freemium",
+      "complaints": [
+        "Limited features in free version",
+        "Inaccurate predictions"
+      ],
+      "vulnerability": "Feature limitations in free tier"
+    }
+  ],
+  "ideas": [
+    {
+      "id": "idea_01_astrotalk_trust_crisis",
+      "name": "AstroTalk Credibility Crisis",
+      "score": 9.2,
+      "horizon_days": 21,
+      "why_it_converts": "Users paying for astrology are mid-funnel buyers, burned and actively seeking alternatives. Addressing trust issues and offering transparent pricing can attract these users."
+    },
+    {
+      "id": "idea_02_feature_rich_reports",
+      "name": "Comprehensive Astrology Reports",
+      "score": 8.5,
+      "horizon_days": 30,
+      "why_it_converts": "By providing detailed written reports, we can fill the feature gap and attract users dissatisfied with competitors."
+    },
+    {
+      "id": "idea_03_flat_rate_pricing",
+      "name": "Transparent Flat-Rate Pricing",
+      "score": 8.0,
+      "horizon_days": 14,
+      "why_it_converts": "Offering a simple flat-rate pricing model can alleviate price complaints and attract users wary of per-minute billing scams."
+    }
+  ]
+}

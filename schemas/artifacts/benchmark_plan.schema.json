@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/benchmark_plan",
+  "title": "Benchmark Plan",
+  "description": "Plan artifact for the provider-benchmark pipeline. Declares the matrix of prompts x providers x variations to execute with controlled parameters.",
+  "type": "object",
+  "required": ["version", "cells"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "objective": { "type": "string", "description": "Human-readable description of what this benchmark is measuring (e.g., 'cinematic still quality across paid image providers')." },
+    "controls": {
+      "type": "object",
+      "description": "Parameters held constant across cells where the provider supports them.",
+      "properties": {
+        "seed": { "type": "integer" },
+        "aspect_ratio": { "type": "string" },
+        "resolution": { "type": "string" },
+        "negative_prompt": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "prompts": {
+      "type": "array",
+      "description": "Reusable prompt definitions referenced by cells via prompt_id.",
+      "items": {
+        "type": "object",
+        "required": ["id", "modality", "text"],
+        "properties": {
+          "id": { "type": "string" },
+          "modality": { "type": "string", "enum": ["image", "video"] },
+          "text": { "type": "string" },
+          "negative_prompt": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "cells": {
+      "type": "array",
+      "description": "One entry per (prompt x provider x variation) intended call.",
+      "items": {
+        "type": "object",
+        "required": ["cell_id", "prompt_id", "provider", "tool"],
+        "properties": {
+          "cell_id": { "type": "string", "description": "Unique cell identifier, e.g. 'whiskey-flux-pro-v1'." },
+          "prompt_id": { "type": "string", "description": "References prompts[].id." },
+          "modality": { "type": "string", "enum": ["image", "video"] },
+          "provider": { "type": "string", "description": "Provider name (e.g. flux, google_imagen, runway, veo)." },
+          "model": { "type": "string", "description": "Specific model or variant (e.g. flux-pro-1.1, veo-3.1, runway-gen4)." },
+          "tool": { "type": "string", "description": "Registered tool name from the tool registry that will execute the call." },
+          "params": {
+            "type": "object",
+            "description": "Per-cell parameter overrides (seed, resolution, duration, aspect_ratio, etc.).",
+            "additionalProperties": true
+          },
+          "variation_index": { "type": "integer", "minimum": 0 },
+          "estimated_cost_usd": { "type": "number", "minimum": 0 },
+          "rationale": { "type": "string", "description": "Why this provider/model was included in the benchmark." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "estimated_total_cost_usd": { "type": "number", "minimum": 0 },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

@@ -1,18 +1,31 @@
-"""Google Veo 3.1 video generation via fal.ai API.
+"""Google Veo 3.1 video generation.
 
-Supports text-to-video, image-to-video, reference-to-video, and first/last-frame
-interpolation so agents can preserve visual consistency instead of relying only on
-raw text prompts.
+Supports two providers:
+- `gemini` (DEFAULT): native Google Gemini API via google-genai SDK. Uses
+  GEMINI_API_KEY / GOOGLE_API_KEY. Cleanest path; no third-party account needed.
+- `fal`: fal.ai relay. Uses FAL_KEY / FAL_AI_API_KEY. Kept for backwards compat.
+
+Modes (both providers): text-to-video, image-to-video, reference-to-video,
+first/last-frame interpolation.
 """
 
 from __future__ import annotations
 
-import os
-import mimetypes
 import base64
+import json
+import mimetypes
+import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+GEMINI_MODEL_MAP = {
+    "veo3.1": "veo-3.1-generate-preview",
+    "veo3.1/fast": "veo-3.1-fast-generate-preview",
+    "veo3": "veo-3.0-generate-preview",
+    "veo3/fast": "veo-3.0-fast-generate-preview",
+}
 
 from tools.base_tool import (
     BaseTool,
@@ -41,8 +54,11 @@ class VeoVideo(BaseTool):
 
     dependencies = []
     install_instructions = (
-        "Set FAL_KEY or FAL_AI_API_KEY to your fal.ai API key.\n"
-        "  Get one at https://fal.ai/dashboard/keys"
+        "Default provider is Google Gemini (recommended).\n"
+        "  Set GEMINI_API_KEY (or GOOGLE_API_KEY) — get one at https://aistudio.google.com/apikey\n"
+        "  pip install google-genai\n"
+        "Alternative provider 'fal':\n"
+        "  Set FAL_KEY (or FAL_AI_API_KEY) — get one at https://fal.ai/dashboard/keys"
     )
     agent_skills = ["ai-video-gen"]
 
@@ -69,6 +85,12 @@ class VeoVideo(BaseTool):
         "required": ["prompt"],
         "properties": {
             "prompt": {"type": "string"},
+            "provider": {
+                "type": "string",
+                "enum": ["gemini", "fal"],
+                "default": "gemini",
+                "description": "API route. 'gemini' (default) uses Google's native Gemini API; 'fal' relays through fal.ai.",
+            },
             "operation": {
                 "type": "string",
                 "enum": ["text_to_video", "image_to_video", "reference_to_video", "first_last_frame_to_video"],
@@ -139,11 +161,23 @@ class VeoVideo(BaseTool):
         "Listen for audio synchronization and quality",
     ]
 
-    def _get_api_key(self) -> str | None:
+    def _get_gemini_key(self) -> str | None:
+        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    def _get_fal_key(self) -> str | None:
         return os.environ.get("FAL_KEY") or os.environ.get("FAL_AI_API_KEY")
 
+    def _get_api_key(self, provider: str = "gemini") -> str | None:
+        return self._get_gemini_key() if provider == "gemini" else self._get_fal_key()
+
     def get_status(self) -> ToolStatus:
-        if self._get_api_key():
+        if self._get_gemini_key():
+            try:
+                import google.genai  # noqa: F401
+                return ToolStatus.AVAILABLE
+            except ImportError:
+                pass
+        if self._get_fal_key():
             return ToolStatus.AVAILABLE
         return ToolStatus.UNAVAILABLE
 
@@ -192,7 +226,197 @@ class VeoVideo(BaseTool):
         return None
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = self._get_api_key()
+        provider = inputs.get("provider", "gemini")
+        start = time.time()
+        if provider == "gemini":
+            result = self._execute_gemini(inputs, start)
+        elif provider == "fal":
+            result = self._execute_fal(inputs, start)
+        else:
+            return ToolResult(success=False, error=f"unknown provider '{provider}'")
+
+        if result.success:
+            self._write_sidecar(inputs, result, provider, start)
+        return result
+
+    def _write_sidecar(self, inputs: dict[str, Any], result: ToolResult, provider: str, start: float) -> None:
+        try:
+            output_path_str = (result.data or {}).get("output")
+            if not output_path_str:
+                return
+            output_path = Path(output_path_str)
+            sidecar = {
+                "tool": self.name,
+                "tool_version": self.version,
+                "provider": provider,
+                "model": (result.data or {}).get("model"),
+                "operation": inputs.get("operation", "text_to_video"),
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "duration_seconds": round(time.time() - start, 2),
+                "request": {
+                    "user_prompt": inputs["prompt"],
+                    "model_variant": inputs.get("model_variant", "veo3.1"),
+                    "video_duration": inputs.get("duration", "8s"),
+                    "aspect_ratio": inputs.get("aspect_ratio", "16:9"),
+                    "resolution": inputs.get("resolution", "1080p"),
+                    "generate_audio": inputs.get("generate_audio", True),
+                    "negative_prompt": inputs.get("negative_prompt"),
+                    "seed": inputs.get("seed"),
+                    "image_path": inputs.get("image_path"),
+                    "image_url": inputs.get("image_url"),
+                    "reference_image_paths": inputs.get("reference_image_paths"),
+                    "first_frame_path": inputs.get("first_frame_path"),
+                    "last_frame_path": inputs.get("last_frame_path"),
+                },
+                "estimated_cost_usd": result.cost_usd,
+                "video_path": str(output_path),
+            }
+            sidecar_path = output_path.with_suffix(output_path.suffix + ".prompt.json")
+            sidecar_path.write_text(json.dumps(sidecar, indent=2, default=str), encoding="utf-8")
+            if result.artifacts is not None:
+                result.artifacts.append(str(sidecar_path))
+            if isinstance(result.data, dict):
+                result.data["prompt_log"] = str(sidecar_path)
+        except Exception:
+            pass
+
+    def _execute_gemini(self, inputs: dict[str, Any], start: float) -> ToolResult:
+        api_key = self._get_gemini_key()
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="GEMINI_API_KEY / GOOGLE_API_KEY not set. " + self.install_instructions,
+            )
+
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            return ToolResult(
+                success=False,
+                error="google-genai not installed. Run: pip install google-genai",
+            )
+
+        prompt = inputs["prompt"]
+        op = inputs.get("operation", "text_to_video")
+        variant = inputs.get("model_variant", "veo3.1")
+        model = GEMINI_MODEL_MAP.get(variant, "veo-3.1-generate-preview")
+
+        duration_str = str(inputs.get("duration", "8s"))
+        duration_int = int(duration_str.replace("s", "")) if duration_str.endswith("s") else 8
+
+        config_kwargs: dict[str, Any] = {}
+        if inputs.get("aspect_ratio"):
+            config_kwargs["aspect_ratio"] = inputs["aspect_ratio"]
+        if inputs.get("negative_prompt"):
+            config_kwargs["negative_prompt"] = inputs["negative_prompt"]
+        if inputs.get("seed") is not None:
+            config_kwargs["seed"] = inputs["seed"]
+        if inputs.get("resolution"):
+            config_kwargs["resolution"] = inputs["resolution"]
+        config_kwargs["duration_seconds"] = duration_int
+        # NOTE: The Gemini Veo backend rejects requests carrying the
+        # `generate_audio` field on certain preview model/region combinations
+        # ("generate_audio parameter is not supported in Gemini API"). The
+        # google-genai SDK happily accepts it locally — failure only surfaces
+        # when the API receives the request. Only forward the field when the
+        # caller explicitly sets it; otherwise let the model's default apply.
+        # Setting generate_audio=False when the API rejects the field is not
+        # currently supported via this path (use the fal provider instead).
+        if "generate_audio" in inputs and inputs["generate_audio"] is not None:
+            config_kwargs["generate_audio"] = bool(inputs["generate_audio"])
+
+        def _load_image(path_str: str | None, url_str: str | None):
+            if path_str:
+                p = Path(path_str)
+                if not p.exists():
+                    raise FileNotFoundError(f"Image not found: {p}")
+                mime = mimetypes.guess_type(p.name)[0] or "image/png"
+                return types.Image(image_bytes=p.read_bytes(), mime_type=mime)
+            if url_str:
+                import requests as _r
+                resp = _r.get(url_str, timeout=60)
+                resp.raise_for_status()
+                mime = resp.headers.get("Content-Type", "image/png").split(";")[0]
+                return types.Image(image_bytes=resp.content, mime_type=mime)
+            return None
+
+        kwargs: dict[str, Any] = {"model": model, "prompt": prompt}
+
+        try:
+            if op == "text_to_video":
+                pass
+            elif op == "image_to_video":
+                img = _load_image(inputs.get("image_path"), inputs.get("image_url"))
+                if not img:
+                    return ToolResult(success=False, error="image_to_video requires image_path or image_url")
+                kwargs["image"] = img
+            elif op == "reference_to_video":
+                paths = list(inputs.get("reference_image_paths") or [])
+                urls = list(inputs.get("reference_image_urls") or [])
+                refs = [_load_image(p, None) for p in paths] + [_load_image(None, u) for u in urls]
+                refs = [r for r in refs if r is not None]
+                if not refs:
+                    return ToolResult(success=False, error="reference_to_video requires reference_image_paths or reference_image_urls")
+                config_kwargs["reference_images"] = refs
+            elif op == "first_last_frame_to_video":
+                first_img = _load_image(inputs.get("first_frame_path"), inputs.get("first_frame_url"))
+                last_img = _load_image(inputs.get("last_frame_path"), inputs.get("last_frame_url"))
+                if not first_img or not last_img:
+                    return ToolResult(success=False, error="first_last_frame_to_video requires first_frame and last_frame")
+                kwargs["image"] = first_img
+                config_kwargs["last_frame"] = last_img
+            else:
+                return ToolResult(success=False, error=f"unknown operation '{op}'")
+
+            kwargs["config"] = types.GenerateVideosConfig(**config_kwargs)
+
+            client = genai.Client(api_key=api_key)
+            operation = client.models.generate_videos(**kwargs)
+
+            poll_secs = 10
+            max_wait = 600
+            waited = 0
+            while not operation.done and waited < max_wait:
+                time.sleep(poll_secs)
+                waited += poll_secs
+                operation = client.operations.get(operation)
+
+            if not operation.done:
+                return ToolResult(success=False, error=f"Veo generation timed out after {max_wait}s")
+
+            if not operation.response or not operation.response.generated_videos:
+                err = getattr(operation, "error", None)
+                return ToolResult(success=False, error=f"Veo returned no video. Error: {err}")
+
+            video = operation.response.generated_videos[0]
+            client.files.download(file=video.video)
+
+            output_path = Path(inputs.get("output_path", "veo_output.mp4"))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            video.video.save(str(output_path))
+
+        except Exception as e:
+            return ToolResult(success=False, error=f"Veo (gemini) failed: {e}")
+
+        return ToolResult(
+            success=True,
+            data={
+                "provider": "gemini",
+                "model": model,
+                "prompt": prompt,
+                "output": str(output_path),
+                "has_audio": bool(inputs.get("generate_audio", True)),
+                "operation": op,
+            },
+            artifacts=[str(output_path)],
+            cost_usd=self.estimate_cost(inputs),
+            duration_seconds=round(time.time() - start, 2),
+            model=model,
+        )
+
+    def _execute_fal(self, inputs: dict[str, Any], start: float) -> ToolResult:
+        api_key = self._get_fal_key()
         if not api_key:
             return ToolResult(
                 success=False,
@@ -201,7 +425,6 @@ class VeoVideo(BaseTool):
 
         import requests
 
-        start = time.time()
         operation = inputs.get("operation", "text_to_video")
         variant = inputs.get("model_variant", "veo3.1")
         duration = inputs.get("duration", "8s")

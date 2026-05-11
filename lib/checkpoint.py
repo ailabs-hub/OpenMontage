@@ -2,10 +2,16 @@
 
 Each stage writes a checkpoint after completion. The orchestrator uses
 checkpoints to resume pipelines and to present state at human checkpoints.
+
+Gates are separate from checkpoints and are non-bypassable. A gate file
+MUST exist before the next stage begins. It contains validation results
+and a checksum of the stage's output, making it impossible to fake
+completion without producing actual artifacts.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from functools import lru_cache
 from datetime import datetime, timezone
@@ -339,3 +345,141 @@ def get_next_stage(
         if stage not in completed:
             return stage
     return None
+
+
+# ── Gate System ──────────────────────────────────────────────────────────────
+# Gates are separate from checkpoints and are non-bypassable. Each gate file
+# MUST exist before the next stage begins. It contains validation results
+# and a checksum of the stage's output, making it impossible to fake
+# completion without producing actual artifacts.
+
+GATE_SCHEMA = {
+    "type": "object",
+    "required": ["gate_id", "stage", "status", "validation", "timestamp"],
+    "properties": {
+        "gate_id": {"type": "string"},
+        "stage": {"type": "string"},
+        "status": {"type": "string", "enum": ["passed", "failed"]},
+        "validation": {"type": "object"},
+        "checksum": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "agent_version": {"type": "string"},
+    },
+}
+
+
+class GateValidationError(ValueError):
+    """Raised when a gate fails validation or a required gate is missing."""
+
+
+def _compute_checksum(artifact_paths: list[Path]) -> str:
+    """Compute SHA-256 checksum of stage artifact file contents.
+
+    Concatenates file paths and contents in sorted order to produce a
+    deterministic hash. An empty list produces a hash of the empty string.
+    """
+    hasher = hashlib.sha256()
+    for path in sorted(artifact_paths):
+        hasher.update(path.name.encode("utf-8"))
+        if path.exists():
+            hasher.update(path.read_bytes())
+        else:
+            hasher.update(b"__MISSING__")
+    return f"sha256:{hasher.hexdigest()}"
+
+
+def write_gate(
+    project_dir: Path,
+    gate_id: str,
+    stage: str,
+    validation: dict[str, Any],
+    artifact_paths: list[Path] | None = None,
+    *,
+    agent_version: str = "marketing-creative-orchestrator-v1.0",
+    metadata: Optional[dict[str, Any]] = None,
+) -> Path:
+    """Write a non-bypassable gate file for a pipeline stage.
+
+    The gate records whether the stage's output passed validation and
+    includes a checksum of the actual artifact files. If the gate fails
+    (any validation field is False), the pipeline must halt.
+    """
+    # Determine status: if any validation value is explicitly False, gate fails
+    status = "passed"
+    for key, value in validation.items():
+        if value is False:
+            status = "failed"
+            break
+
+    gate = {
+        "gate_id": gate_id,
+        "stage": stage,
+        "status": status,
+        "validation": validation,
+        "checksum": _compute_checksum(artifact_paths or []),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "agent_version": agent_version,
+    }
+    if metadata is not None:
+        gate["metadata"] = metadata
+
+    path = project_dir / "checkpoints" / f"{gate_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(gate, f, indent=2)
+
+    return path
+
+
+def validate_gate(
+    project_dir: Path,
+    gate_id: str,
+    expected_stage: str | None = None,
+) -> dict[str, Any]:
+    """Validate that a gate file exists, passes schema checks, and has status 'passed'.
+
+    Raises GateValidationError if the gate is missing, malformed, failed,
+    or does not match the expected stage.
+    """
+    path = project_dir / "checkpoints" / f"{gate_id}.json"
+    if not path.exists():
+        raise GateValidationError(
+            f"Gate {gate_id!r} not found at {path}. "
+            f"Stage was never completed. Re-run the stage before proceeding."
+        )
+
+    with open(path) as f:
+        gate = json.load(f)
+
+    # Schema validation
+    try:
+        jsonschema.validate(instance=gate, schema=GATE_SCHEMA)
+    except jsonschema.ValidationError as exc:
+        raise GateValidationError(
+            f"Gate {gate_id!r} failed schema validation: {exc.message}"
+        ) from exc
+
+    # Stage match
+    if expected_stage and gate.get("stage") != expected_stage:
+        raise GateValidationError(
+            f"Gate {gate_id!r} stage mismatch: expected {expected_stage!r}, "
+            f"got {gate.get('stage')!r}"
+        )
+
+    # Status check
+    if gate.get("status") != "passed":
+        failed_checks = [
+            k for k, v in gate.get("validation", {}).items() if v is False
+        ]
+        raise GateValidationError(
+            f"Gate {gate_id!r} status is 'failed'. "
+            f"Failed validations: {failed_checks}. "
+            f"Fix the stage output and re-run before proceeding."
+        )
+
+    return gate
+
+
+def gate_exists(project_dir: Path, gate_id: str) -> bool:
+    """Check whether a gate file exists on disk."""
+    return (project_dir / "checkpoints" / f"{gate_id}.json").exists()

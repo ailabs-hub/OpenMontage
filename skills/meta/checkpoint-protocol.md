@@ -87,9 +87,25 @@ When `human_approval_default: true`:
    - `compose` — Rarely. But human may want to preview.
    - `publish` — Always. Human must approve before anything goes public.
 
-### Step 5: Determine Next Stage
+### Step 5: Gate Check (MANDATORY)
 
-After checkpoint is written and approved (if needed):
+Before transitioning to the next stage, verify ALL of the following:
+
+1. **Checkpoint exists on disk:** `checkpoint_[stage].json` must be present at `[project_path]/checkpoint_[stage].json`
+2. **Checkpoint status is valid:** `status` field must be `"completed"` (not `"awaiting_human"` unless human just approved)
+3. **Canonical artifacts exist:** Every artifact referenced in the checkpoint's `artifacts` field must resolve to an actual file on disk
+4. **Artifact schema validation passed:** If a schema exists for the artifact, it must validate
+
+**Gate failure actions:**
+- If checkpoint is missing → Stage was never completed. Halt. Report: "Pipeline inconsistent: no checkpoint for [stage]. Re-run [stage] before proceeding."
+- If artifact file is missing → Subagent claimed success but did not write files. Halt. Report: "Pipeline inconsistent: checkpoint claims [artifact] but file not found at [path]. Re-run [stage]."
+- If schema validation fails → Artifact is malformed. Halt. Report: "Artifact [name] failed schema validation. Details: [errors]."
+
+**Never skip the gate check to save time.** Silent gate failures cause downstream stages to use missing or fabricated inputs, producing phantom assets and false review data.
+
+### Step 6: Determine Next Stage
+
+After checkpoint is written, approved (if needed), **and gate check passes**:
 
 ```python
 next_stage = get_next_stage(pipeline_dir, project_name)
@@ -97,7 +113,7 @@ next_stage = get_next_stage(pipeline_dir, project_name)
 
 This reads all existing checkpoints and returns the next stage that needs to run, or `None` if the pipeline is complete.
 
-### Step 6: Resume Protocol
+### Step 7: Resume Protocol
 
 At the START of any pipeline run (not just after a stage), always check for existing progress:
 
@@ -153,10 +169,12 @@ Does this feel right? I can adjust: voice, visual style, pacing, music, colors.
 
 1. **Always checkpoint completed work.** Even if `checkpoint_required: false`, consider checkpointing anyway if the stage took significant time or cost. Losing work is worse than an extra file on disk.
 
-2. **Never skip human approval on creative stages.** `idea` and `script` shape everything. Rushing past them to save time produces videos nobody wants.
+2. **Never skip the gate check.** A missing checkpoint or missing artifact file means the stage did not actually complete. Do not proceed to the next stage. Halt and fix.
 
-3. **Include cost snapshots.** The human should know how much has been spent and how much remains before approving expensive downstream stages (assets, compose).
+3. **Never skip human approval on creative stages.** `idea` and `script` shape everything. Rushing past them to save time produces videos nobody wants.
 
-4. **Checkpoints enable resume.** If the pipeline crashes at `compose`, the human can restart and it picks up from `compose` — not from `idea`. This is the whole point.
+4. **Include cost snapshots.** The human should know how much has been spent and how much remains before approving expensive downstream stages (assets, compose).
 
-5. **Be transparent in approval requests.** Don't just show the artifact — show the review findings, the cost, and any concerns. Help the human make an informed decision.
+5. **Checkpoints enable resume.** If the pipeline crashes at `compose`, the human can restart and it picks up from `compose` — not from `idea`. This is the whole point.
+
+6. **Be transparent in approval requests.** Don't just show the artifact — show the review findings, the cost, and any concerns. Help the human make an informed decision.

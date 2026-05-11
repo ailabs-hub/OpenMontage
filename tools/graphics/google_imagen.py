@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -209,6 +211,33 @@ class GoogleImagen(BaseTool):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_bytes)
 
+            response_metadata = {k: v for k, v in data.items() if k != "predictions"}
+            prediction_metadata = {
+                k: v for k, v in predictions[0].items() if k != "bytesBase64Encoded"
+            }
+            sidecar = {
+                "tool": self.name,
+                "tool_version": self.version,
+                "provider": "google_imagen",
+                "model": model,
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "duration_seconds": round(time.time() - start, 2),
+                "request": {
+                    "user_prompt": prompt,
+                    "aspect_ratio": aspect_ratio,
+                    "number_of_images": number_of_images,
+                    "parameters_sent": parameters,
+                },
+                "google_revised_prompt": None,
+                "raw_response_metadata": response_metadata,
+                "prediction_metadata": prediction_metadata,
+                "image_path": str(output_path),
+            }
+            sidecar_path = output_path.with_suffix(output_path.suffix + ".prompt.json")
+            sidecar_path.write_text(
+                json.dumps(sidecar, indent=2, default=str), encoding="utf-8"
+            )
+
         except Exception as e:
             return ToolResult(success=False, error=f"Imagen generation failed: {e}")
 
@@ -220,9 +249,10 @@ class GoogleImagen(BaseTool):
                 "prompt": prompt,
                 "aspect_ratio": aspect_ratio,
                 "output": str(output_path),
+                "prompt_log": str(sidecar_path),
                 "images_generated": len(predictions),
             },
-            artifacts=[str(output_path)],
+            artifacts=[str(output_path), str(sidecar_path)],
             cost_usd=self.estimate_cost(inputs),
             duration_seconds=round(time.time() - start, 2),
             model=model,

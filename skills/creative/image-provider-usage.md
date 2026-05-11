@@ -12,6 +12,7 @@
 | `flux_image` | FLUX 2 Pro via fal.ai | ~$0.03-0.05 | ~5-10s | Photorealism, general purpose, workhorse |
 | `grok_image` | Grok Imagine Image (xAI) | $0.02/output + $0.002/input edit image | ~5-15s | Image edits, style transfer, multi-image compositing |
 | `openai_image` | GPT Image 1 (OpenAI) | ~$0.01-0.17 | ~5-15s | Complex instructions, text in images, multi-element |
+| `seedream_image` | ByteDance Seedream 4.5 via fal.ai | $0.04 flat | ~15-25s | Text/typography, multi-ref composition, precise editing, 4K |
 | `recraft_image` | Recraft V4 via fal.ai | ~$0.04-0.25 | ~5-10s | Logos, SVG vectors, brand assets, text rendering (see caveat below) |
 | `local_diffusion` | Stable Diffusion (local) | Free | ~30s+ | Offline, privacy, free |
 | `image_gen` | Multi (legacy, deprecated) | Varies | Varies | **Deprecated** — use `image_selector` or per-provider tools |
@@ -37,10 +38,11 @@
 | **Technical diagram** | `diagram_gen` | Structured, editable | `flux_image` with diagram prompt |
 | **Abstract/conceptual illustration** | `flux_image` | AI excels at custom concepts | `openai_image` |
 | **Style transfer / repaint of an existing image** | `grok_image` | Native edit flow, strong promptable transforms | `openai_image` |
-| **Multi-image merge / composite** | `grok_image` | Can combine multiple source images into one scene | `openai_image` |
-| **Logo or brand asset** | `recraft_image` | SVG support, text accuracy | `openai_image` |
-| **Image with text/labels** | `openai_image` | Best text rendering (GPT Image 1) | `recraft_image` |
+| **Multi-image merge / composite** | `seedream_image` | Fuse up to 10 refs with cross-image consistency | `grok_image` |
+| **Logo or brand asset** | `recraft_image` | SVG support, text accuracy | `seedream_image` |
+| **Image with text/labels** | `seedream_image` | Best-in-class typography, exact string rendering | `openai_image` |
 | **Complex multi-element composition** | `openai_image` | Best instruction following | `flux_image` |
+| **Precise image editing** | `seedream_image` | Unified generation+editing architecture | `grok_image` |
 | **Hero image (key visual)** | `flux_image` | Highest visual quality | `openai_image` |
 | **Thumbnail** | `flux_image` or `recraft_image` | Needs to be eye-catching | — |
 | **Budget/free project** | `pexels_image` or `pixabay_image` | Free, immediate | `local_diffusion` |
@@ -52,16 +54,30 @@
 - **`style` parameter causes 422 errors** (as of 2026-04). The `style` enum values (`digital_illustration`, `realistic_image`, etc.) are rejected by fal.ai's Recraft V4 endpoint. **Workaround:** encode style direction in the prompt text instead (e.g. "digital illustration of a tooth cross-section" rather than `style="digital_illustration"`). The `image_size` and `colors` parameters work fine.
 - **Text rendering is unreliable for exact business names.** Recraft (like all AI image models) may hallucinate wrong text. For any scene where text must be verbatim (CTA screens, business names, phone numbers), use Remotion `text_card` instead of generating an image with text.
 
+### Seedream 4.5 via fal.ai
+- **Flat pricing regardless of resolution.** $0.04/image whether you request `square` or `auto_4K`. Always generate at the highest resolution you need — there is no cost penalty.
+- **Edit mode requires image URLs, not local paths.** For `generation_mode="edit"`, source images must be accessible via URL. Upload local images to a temporary URL first, or use `image_url` with a publicly accessible link.
+- **Reference image limit:** Up to 10 images for edit mode. Beyond 4–5 meaningful references, quality may degrade.
+- **Safety checker is on by default.** Set `enable_safety_checker=false` only in controlled environments where content filtering is handled upstream.
+- **No negative prompts.** Seedream does not support negative prompts. Describe what you want and use exclusion phrases in the main prompt instead.
+
 ## Cost-Quality Tradeoff
 
 ```
 
-PRODUCTION PATH: Premium
+PRODUCTION PATH: Premium (Text-Heavy)
+├── Hero images: seedream_image ($0.04/img) — 4K, text-accurate
+├── Supporting visuals: seedream_image ($0.04/img) — 2K
+├── Text-overlay base images: seedream_image ($0.04/img)
+├── B-roll stills: pexels_image ($0.00)
+└── Total for 10 images: ~$0.40
+
+PRODUCTION PATH: Premium (Photoreal)
 ├── Hero images: flux_image ($0.05/img)
 ├── Supporting visuals: flux_image ($0.03/img)
-├── Text overlays: openai_image ($0.04/img)
+├── Text overlays: seedream_image ($0.04/img)
 ├── B-roll stills: pexels_image ($0.00)
-└── Total for 10 images: ~$0.35
+└── Total for 10 images: ~$0.38
 
 PRODUCTION PATH: Standard
 ├── All generated: flux_image ($0.03/img)

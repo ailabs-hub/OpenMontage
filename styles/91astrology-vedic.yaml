@@ -1,0 +1,91 @@
+identity:
+  name: "91 Astrology — Vedic Premium"
+  category: cinematic
+  mood: sacred, intimate, contemplative, premium editorial
+  pace: slow
+  best_for: "91 Astrology brand assets — hero shots, app cards, onboarding screens, founder/astrologer portraits, ceremony moments"
+
+visual_language:
+  color_palette:
+    primary: ["#0a1230", "#1a2150"]
+    accent: ["#c9a14d", "#c44d1a"]
+    background: "#0a1230"
+    text: "#f5ecd9"
+    muted: "#1a2150"
+  composition: rule-of-thirds with the hero element on a third intersection, generous negative space on at least one side for typography overlay, candlelight or single-source warm light positioned at frame edge for rim lighting
+  texture: fine 35mm film grain, warm filmic color grade, no flat-vector look
+
+typography:
+  headings:
+    font: "Outfit"
+    weight: 700
+    tracking: "-0.01em"
+  body:
+    font: "Inter"
+    weight: 400
+    line_height: 1.55
+  stat_card:
+    font: "Outfit"
+    weight: 800
+    size_multiplier: 2.6
+  scale_system: "major_third"
+  weight_matrix:
+    title: 800
+    heading: 700
+    body: 400
+    caption: 400
+
+motion:
+  transitions: [fade, slow-dissolve, gentle-zoom-in]
+  animation_style: "ease-in-out, slow and deliberate, sacred pacing, no bounce, no whip motion"
+  pacing_rules:
+    min_scene_hold_seconds: 3.0
+    max_scene_hold_seconds: 12
+    text_card_hold_seconds: 4.0
+    transition_duration_seconds: 0.6
+  entrance: "fade-in with very subtle scale (0.97 -> 1.0)"
+  exit: "fade-out, slow"
+
+audio:
+  voice_style: "warm, lower-register, unhurried, reverent — 60s/70s Indian male broadcaster meets contemporary podcast host"
+  music_mood: "Indian classical textural under-bed: tanpura drone, occasional bansuri or sustained string pad. No percussion, no rhythm hits, no trailer swell."
+  music_volume: 0.10
+  sfx_style: "diegetic only — flame crackle, parchment rustle, distant temple bell, brass-on-paper scratch. No synthetic whooshes."
+  ducking_threshold_db: -6
+
+asset_generation:
+  image_prompt_prefix: "Photoreal editorial cinematography in the tradition of Steve McCurry, warm filmic color grading, fine 35mm film grain, single warm amber practical light source for low-angle rim lighting, deep midnight navy negative space tones, antique gold and cream highlights, "
+  image_negative_prompt: "flat vector illustration, 3D render, cartoon, VFX aesthetic, plastic skin, harsh studio lighting, cool blue tones, neon, modern minimalist white space, watermarks, on-image text"
+  consistency_anchors:
+    - "Single warm amber practical light source from one frame edge — never overhead, never multiple sources"
+    - "Color temperature ~2700K candlelight, never cool or daylight-balanced"
+    - "Midnight navy #0a1230 dominates the negative-space regions"
+    - "Antique gold #c9a14d for filigree, glints, jewellery, brass artifacts"
+    - "Cream #f5ecd9 for parchment / kundli paper / app card surfaces"
+    - "Deep saffron #c44d1a for shawl edges or accent fabric"
+    - "Photoreal textures only — real skin pores, authentic fabric weave, real wood grain"
+    - "Decorative-only Devanagari is acceptable; readable Sanskrit is not promised"
+    - "Subject occupies the lower or right two-thirds; negative space on opposing third for text overlay"
+
+quality_rules:
+  - "Minimum contrast ratio 4.5:1 for any text overlay against background"
+  - "Audio: under-bed music never exceeds -12 LUFS; voice (when present) -16 LUFS target"
+  - "No hard cuts; transitions are slow dissolves or fades only"
+  - "Hold establishing shots for 3.0s minimum"
+  - "Never request readable Sanskrit text inside generated images or videos — burn it in via Remotion / HyperFrames overlay if needed"
+  - "Do not render brand name '91 Astrology' as on-image text — handle via overlay in compose"
+  - "Single light source rule: every shot has exactly one warm amber practical light at a frame edge"
+  - "No symmetric centered compositions — always rule-of-thirds for hero placement"
+
+chart_palette:
+  - "#c9a14d"
+  - "#c44d1a"
+  - "#1a2150"
+  - "#f5ecd9"
+  - "#0a1230"
+  - "#7d6a35"
+
+color_rules:
+  harmony_type: "complementary"
+  contrast_validation: true
+  colorblind_safe: false

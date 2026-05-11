@@ -46,6 +46,26 @@ This is a first-class workflow in OpenMontage.
 
 If a model misses this distinction, it will often fall back to plain search + guesswork. That is incorrect for OpenMontage.
 
+## Marketing Creative Entry Point
+
+When the user mentions **marketing campaigns, ad creatives, copy variants, or running an idea through a pipeline** — for example:
+
+- "Run idea-01 through the pipeline"
+- "Generate ad creatives for [company]"
+- "I want to create a marketing campaign for..."
+- "Make me some ad images for..."
+- "Let's run the marketing pipeline"
+
+— this is **not** a generic video production request. It goes through the `marketing-creative` pipeline, which produces static marketing assets (images, copy) not videos.
+
+### Required behavior
+
+1. **Read:** `.agents/skills/marketing-creative-orchestrator/SKILL.md`
+2. **Follow the orchestrator skill** — it defines idea discussion, subagent spawning, steering rules, and the full execution flow
+3. **Do NOT fall back to video pipelines** (animated-explainer, cinematic, etc.) for marketing creative requests
+
+The orchestrator handles: research → creative_concept → copy → assets → review, spawning a specialized subagent per stage and steering their outputs using Visual Brief rules and language propagation enforcement.
+
 ## Rule Zero — All Production Goes Through a Pipeline
 
 **Every video production request MUST go through the pipeline system. No exceptions.**
@@ -234,6 +254,7 @@ If the folder has tracks, the proposal and asset stages should present them as o
 | `hybrid` | Source footage plus support visuals | production |
 | `avatar-spokesperson` | Presenter-led avatar or lip-sync videos | production |
 | `localization-dub` | Subtitle, dub, and translated variants | beta |
+| `marketing-creative` | Static marketing creative production (images, copy variants, ad campaigns) | beta |
 | `framework-smoke` | Test: minimal 2-stage smoke test | test |
 
 > **Beta pipelines** have not been fully audited. They work, but expect rough edges. Mention this when the user selects one.

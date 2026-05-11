@@ -6,11 +6,12 @@
 ## Quick Reference Card
 
 ```
-FLUX RESOLUTION:  1920x1088 (16:9) | 1088x1920 (9:16) — must be multiples of 16
-MAX TOTAL:        4 megapixels (width x height)
-CONSISTENCY:      Use hero image as input_image for subsequent frames
-STYLE SYSTEM:     Derive from subject + audience + tone, then adapt per scene
-BATCH STRATEGY:   Hero at max quality → iterate with klein → final pass with pro
+FLUX RESOLUTION:   1920x1088 (16:9) | 1088x1920 (9:16) — must be multiples of 16
+SEEDREAM RES:     auto_2K | auto_4K | landscape_16:9 | portrait_16:9 — flat $0.04
+MAX TOTAL:         4 megapixels (width x height) for FLUX; up to 4096×4096 for Seedream
+CONSISTENCY:       Use hero image as input_image for subsequent frames
+STYLE SYSTEM:      Derive from subject + audience + tone, then adapt per scene
+BATCH STRATEGY:    Hero at max quality → iterate with klein → final pass with pro
 ```
 
 ## Resolution for Video Frames
@@ -143,13 +144,21 @@ optimized for image/video generation providers.
 | 2. Storyboard iteration | FLUX.2 [klein] 9B | $0.015 | Rapid variations during planning |
 | 3. Final frames | FLUX.2 [pro] | $0.03 | Re-generate finals with hero as reference |
 
+### Seedream Batch Strategy (Text-Heavy Pipelines)
+
+| Phase | Model | Cost/Image | Purpose |
+|-------|-------|-----------|---------|
+| 1. Typography hero | Seedream 4.5 `auto_4K` | $0.04 | Text-accurate hero at max resolution |
+| 2. Variation sweep | Seedream 4.5 `auto_2K` | $0.04 | Rapid variations with `n=4-6` |
+| 3. Edit refinement | Seedream 4.5 `edit` | $0.04 | Precise text/label fixes without regeneration |
+
 **Rate limit:** 24 concurrent requests max. Pipeline accordingly.
 
 **Budget for 8-image explainer:** $0.07 (hero) + $0.12 (8x klein iterations) + $0.24 (8x pro finals) = ~$0.43
 
 ## Common Pitfalls
 
-1. **Text in images** — AI image generators are unreliable with text. Never include text in prompts; add text as overlays in the compose stage
+1. **Text in images** — Most AI image generators are unreliable with text. The exception is **Seedream 4.5**, which has best-in-class typography rendering. For exact text (labels, CTAs, multilingual), use Seedream. For all other providers, add text as overlays in the compose stage.
 2. **Hands and fingers** — DALL-E 3 and FLUX still struggle. Avoid prompts requiring detailed hand poses
 3. **Inconsistent characters** — Without reference images, the same character will look different each time. Always use the hero reference strategy
 4. **Over-prompting** — Long, complex prompts produce unpredictable results. Keep to 2-3 sentences

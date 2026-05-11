@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -60,8 +62,8 @@ class OpenAIImage(BaseTool):
             "prompt": {"type": "string"},
             "model": {
                 "type": "string",
-                "enum": ["gpt-image-1", "dall-e-3"],
-                "default": "gpt-image-1",
+                "enum": ["gpt-image-2", "gpt-image-2-2026-04-21", "gpt-image-1", "dall-e-3"],
+                "default": "gpt-image-2",
             },
             "size": {
                 "type": "string",
@@ -100,13 +102,17 @@ class OpenAIImage(BaseTool):
         return ToolStatus.UNAVAILABLE
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
-        model = inputs.get("model", "gpt-image-1")
+        model = inputs.get("model", "gpt-image-2")
         quality = inputs.get("quality", "high")
         n = inputs.get("n", 1)
+        if model.startswith("gpt-image-2"):
+            # Token-based: image output $30/1M, text input $5/1M.
+            # Estimates below assume ~1024px square; 1536-wide adds ~50%.
+            cost_map = {"low": 0.011, "medium": 0.042, "high": 0.167, "auto": 0.042}
+            return cost_map.get(quality, 0.042) * n
         if model == "gpt-image-1":
             cost_map = {"low": 0.011, "medium": 0.042, "high": 0.167, "auto": 0.042}
             return cost_map.get(quality, 0.042) * n
-        # dall-e-3 fallback pricing
         quality_map = {"standard": 0.04, "hd": 0.08}
         return quality_map.get(quality, 0.04) * n
 
@@ -121,13 +127,13 @@ class OpenAIImage(BaseTool):
 
         start = time.time()
         client = OpenAI()
-        model = inputs.get("model", "gpt-image-1")
+        model = inputs.get("model", "gpt-image-2")
         prompt = inputs["prompt"]
         size = inputs.get("size", "1024x1024")
         n = inputs.get("n", 1)
 
         try:
-            if model == "gpt-image-1":
+            if model.startswith("gpt-image-"):
                 quality = inputs.get("quality", "high")
                 output_format = inputs.get("output_format", "png")
                 response = client.images.generate(
@@ -158,6 +164,40 @@ class OpenAIImage(BaseTool):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_data)
 
+            try:
+                response_dump = response.model_dump(exclude={"data"})
+                first_datum = response.data[0].model_dump(exclude={"b64_json"})
+                response_dump["data"] = [first_datum]
+            except Exception:
+                response_dump = {"_note": "raw response not serializable"}
+
+            revised_prompt = None
+            try:
+                revised_prompt = getattr(response.data[0], "revised_prompt", None)
+            except Exception:
+                pass
+
+            sidecar = {
+                "tool": self.name,
+                "tool_version": self.version,
+                "provider": "openai",
+                "model": model,
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+                "duration_seconds": round(time.time() - start, 2),
+                "request": {
+                    "user_prompt": prompt,
+                    "size": size,
+                    "quality": inputs.get("quality"),
+                    "output_format": inputs.get("output_format", "png"),
+                    "n": n,
+                },
+                "openai_revised_prompt": revised_prompt,
+                "raw_response_metadata": response_dump,
+                "image_path": str(output_path),
+            }
+            sidecar_path = output_path.with_suffix(output_path.suffix + ".prompt.json")
+            sidecar_path.write_text(json.dumps(sidecar, indent=2, default=str), encoding="utf-8")
+
         except Exception as e:
             return ToolResult(success=False, error=f"OpenAI image generation failed: {e}")
 
@@ -167,9 +207,11 @@ class OpenAIImage(BaseTool):
                 "provider": "openai",
                 "model": model,
                 "prompt": prompt,
+                "revised_prompt": revised_prompt,
                 "output": str(output_path),
+                "prompt_log": str(sidecar_path),
             },
-            artifacts=[str(output_path)],
+            artifacts=[str(output_path), str(sidecar_path)],
             cost_usd=self.estimate_cost(inputs),
             duration_seconds=round(time.time() - start, 2),
             model=model,

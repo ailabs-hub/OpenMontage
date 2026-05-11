@@ -9,6 +9,25 @@ Comprehensive guide to crafting effective text-to-image prompts for FLUX models.
 
 ## Prompt Structure Framework
 
+### Advertising Formula (For Marketing Creative Pipeline)
+
+When generating prompts for advertising campaigns, use this tagged structure to ensure the full OpenMontage optimization stack is applied:
+
+```
+[SHOT_TYPE: [close-up/medium/wide/establishing] of [subject]] +
+[FRAMING: [rule-of-thirds/centered/leading-lines]] +
+[ANGLE: [eye-level/low-angle/high-angle]] +
+[EMOTIONAL_CONTRAST: [mood A] vs [mood B]] +
+[VISUAL_ANCHOR_1: [element 1]] + [VISUAL_ANCHOR_2: [element 2]] +
+[TEXT_OVERLAY: "[phrase]" in [Language] script] +
+[COLOR_PALETTE: [hex codes or named colors]] +
+[LIGHTING: [named pattern — golden hour/Rembrandt/rim/volumetric]] +
+[CAMERA_TECHNICAL: Shot on [camera body] with [lens] at [aperture], [depth-of-field], [film stock]] +
+[STYLE: [photorealistic/cinematic/advertising aesthetic]]
+```
+
+**Why this matters:** GPT Image 2 and Gemini use the Camera/Technical layer to render depth of field, bokeh, film grain, and color science. Without it, images look flat and generic. The total prompt should still be under 400 tokens.
+
 ### Basic Formula
 ```
 [Subject] + [Action] + [Style] + [Context] + [Lighting] + [Technical]
