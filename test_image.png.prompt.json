@@ -1,0 +1,43 @@
+{
+  "tool": "openai_image",
+  "tool_version": "0.1.0",
+  "provider": "openai",
+  "model": "gpt-image-2",
+  "generated_at_utc": "2026-05-13T12:33:07.527541+00:00",
+  "duration_seconds": 193.33,
+  "request": {
+    "user_prompt": "A warm golden candlelit interior with two silhouetted figures, cinematic, 4:5 aspect ratio",
+    "size": "auto",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1
+  },
+  "openai_revised_prompt": null,
+  "raw_response_metadata": {
+    "created": 1778675586,
+    "background": "opaque",
+    "output_format": "png",
+    "quality": "high",
+    "size": "1122x1402",
+    "usage": {
+      "input_tokens": 26,
+      "input_tokens_details": {
+        "image_tokens": 0,
+        "text_tokens": 26
+      },
+      "output_tokens": 6603,
+      "total_tokens": 6629,
+      "output_tokens_details": {
+        "image_tokens": 6603,
+        "text_tokens": 0
+      }
+    },
+    "data": [
+      {
+        "revised_prompt": null,
+        "url": null
+      }
+    ]
+  },
+  "image_path": "test_image.png"
+}

@@ -2,42 +2,76 @@
 name: marketing-creative-orchestrator
 description: >
   Layer 3 orchestrator agent for the marketing-creative pipeline.
-  Invoked in a fresh window to discuss/finalize campaign ideas, then spawns
-  specialized subagents for each pipeline stage (research → creative_concept →
-  copy → assets → review). Steers outputs using Visual Brief rules, language
+  Runs an ALREADY FINALIZED idea through the pipeline stages
+  (research → creative_concept → copy → assets → review) by spawning
+  specialized subagents. Steers outputs using Visual Brief rules, language
   propagation, and v1 vs v2 quality lessons.
+  If the user arrives with an unrefined idea, delegate to the raw-to-idea
+  agent first.
 metadata:
   author: OpenMontage
   version: "1.0.0"
   tags: marketing, creative, orchestrator, pipeline, campaigns
 ---
 
+## Code-Level Orchestrator (Preferred)
+
+This pipeline now has a code-level orchestrator at `pipelines/marketing_creative/orchestrator.py`.
+
+**Preferred invocation:**
+```bash
+python -m pipelines.marketing_creative --campaign-id CAMPAIGN_ID --idea-id IDEA_ID
+```
+
+The code orchestrator:
+- Manages session state in `.session.json`
+- Pre-creates all output directories before spawning subagents
+- Enforces the stage I/O contract (input files must exist, output files must be verified)
+- Writes checkpoints and gates automatically
+- Tracks budget and halts if exceeded
+
+This skill remains as a reference for manual execution or when the code orchestrator is unavailable.
+
 # Marketing Creative Orchestrator
 
 ## When to Use
 
-The user has arrived with a marketing campaign idea, topic, or request to "run an idea through the pipeline." This skill is the **entry point** for ALL marketing creative production in OpenMontage.
+The user wants to **run a finalized campaign idea through the pipeline.** This skill assumes the idea has already been locked — platform, audience, language, and concept are all decided.
 
 **Trigger phrases:**
 - "Run idea-01 through the pipeline"
-- "I want to create a marketing campaign for..."
-- "Generate ad creatives for [company]"
-- "Let's run the marketing pipeline"
-- "Make me some ad images for..."
+- "Start the pipeline for campaign X"
+- "Resume campaign X"
+- "Approve and continue to next stage"
 
 **What this skill does:**
-1. **Idea Discussion** — Talk through the idea pool or raw topic with the user
-2. **Finalization** — Lock the idea, platform, audience, and budget
-3. **Subagent Spawning** — Spawn a specialized subagent for each pipeline stage
-4. **Steering** — Validate subagent outputs against known failure patterns
-5. **Recovery** — Rerun subagents if output quality is below bar
+1. **Subagent Spawning** — Spawn a specialized subagent for each pipeline stage
+2. **Steering** — Validate subagent outputs against known failure patterns
+3. **Recovery** — Rerun subagents if output quality is below bar
+
+**What this skill does NOT do:**
+- It does NOT discuss or refine ideas. That is the `raw-to-idea` agent's job.
+- It does NOT brainstorm angles or platforms.
+
+## Delegation Rule
+
+**If the user arrives with an unrefined idea** (e.g., "I have an idea...", "look at this ad", "what do you think of this concept?"):
+
+→ **Delegate to the `raw-to-idea` agent FIRST.**
+
+The raw-to-idea agent will:
+- Refine the idea with the user
+- Write it to the idea pool
+- Then invoke this orchestrator automatically
+
+**Do NOT try to handle idea refinement inline.** The raw-to-idea agent is designed for that.
 
 ## Architecture
 
 ```
-User invokes orchestrator
+User invokes orchestrator (idea already finalized)
     ↓
-Phase 1: Idea Discussion (orchestrator = you)
+Phase 1: Load idea + initialize campaign workspace
     ↓
 Phase 2: Spawn subagents sequentially via Agent tool
     ├── research subagent  → produces research_brief
@@ -51,63 +85,29 @@ Phase 3: Present deliverables, A/B plan, budget summary
 
 **The orchestrator is NOT a background worker.** It is the Claude Code agent (you) reading this skill and executing the pipeline by spawning subagents for each stage. You stay in control. You steer. You approve subagent outputs before the next stage begins.
 
-## Phase 1: Idea Discussion Protocol
+## Locked Brief
 
-### If user provides an idea ID (e.g., "idea-01")
+The locked brief is produced by the `raw-to-idea` agent and written to the campaign README. You do NOT create it. You READ it and pass it to every subagent.
 
-1. Load the idea from the company idea pool directory (read `company_context.paths.idea_pool` from the company profile, resolve relative to the `openMontage/` repo root)
-2. Read the README.md and any existing research
-3. Present a one-paragraph summary to the user
-4. Ask: **"Shall I proceed with this idea, or do you want to adjust the angle/audience/platform?"**
-5. **Do NOT proceed until user confirms**
+If for any reason the locked brief is missing, derive it from:
+- The idea file (`idea_pool/{idea_id}.md`)
+- `company_context.primary_audience`
+- `company_context.platform_focus`
 
-### If user says "pick the best one" or asks for idea pool
-
-1. Scan the company idea pool directory (read `company_context.paths.idea_pool` from the company profile, resolve relative to the `openMontage/` repo root) for available ideas
-2. Sort by score (highest first)
-3. Present the top 3 ideas with:
-   - Idea ID and title
-   - Score (if available)
-   - One-line hook
-   - Platform recommendation
-4. Ask user to pick one
-5. **Do NOT proceed until user selects**
-
-### If user provides a raw topic (no idea pool entry)
-
-1. Treat this as a new idea
-2. Ask clarifying questions (max 3):
-   - What platform? (suggest from company_context.platform_focus)
-   - What audience segment? (suggest from company_context.primary_audience)
-   - Any budget constraints or known competitors?
-3. Summarize back: "So we're making [platform] creatives for [audience] about [topic] — correct?"
-4. **Do NOT proceed until user confirms**
-
-### Lock the Brief
-
-Once the idea is finalized, produce a `locked_brief` (inline markdown, no file needed):
-
+Format:
 ```
 LOCKED BRIEF
 ------------
 Idea: [title]
 Topic: [topic]
 Platform: [platform]
-Language: [single language from config — must be specified by user]
+Language: [single language]
 Audience: [description]
 Budget Cap: $[amount]
 Special Instructions: [any user notes]
 ```
 
-**Language Configuration:**
-The pipeline is language-independent. The user MUST specify the target language before locking the brief. Supported languages:
-- English, Hinglish, Hindi, Odia, Bengali, Marathi, Malayalam, Gujarati, Telugu, Kannada, Tamil
-
-Default from company_context: `primary_audience.languages`. If user overrides, use their choice.
-
 **Rule:** All copy, image text overlays, and CTAs MUST be in the locked language. No mixing unless the locked language itself is a mix (e.g., Hinglish).
-
-**This locked brief is the steering document.** Every subagent receives it. If a subagent drifts from it, steer them back.
 
 ## Batch Multi-Campaign Protocol (MANDATORY)
 
@@ -189,7 +189,6 @@ write_gate(
         "prompt_has_camera_technical": True,
         "prompt_has_shot_type": True,
         "prompt_has_lighting_pattern": True,
-        "prompt_under_400_tokens": True,
         "files_generated": 2,
     },
     artifact_paths=[Path(project_path) / "artifacts" / "asset_manifest.json", ...],
@@ -210,7 +209,6 @@ Gate 3 is the most important gate. It verifies that the Content Generation Execu
 - `prompt_has_camera_technical`: True (contains "mm lens" or "f/" or "film stock")
 - `prompt_has_shot_type`: True (contains "close-up", "medium shot", "wide shot", "establishing shot")
 - `prompt_has_lighting_pattern`: True (contains "golden hour", "Rembrandt", "rim", "volumetric")
-- `prompt_under_400_tokens`: True
 - `files_generated`: N
 
 **If `prompt_has_camera_technical` is False:**
@@ -429,7 +427,6 @@ STEERING RULES — CRITICAL:
   - **Regional language note:** If locked language uses a non-Latin script (Odia, Bengali, Marathi, Malayalam, Gujarati, Telugu, Kannada, Tamil, Hindi-Devanagari), the prompt must specify the script name explicitly (e.g., "text overlay in Bengali script", "text in Telugu script").
   - GPT Image 2 handles Devanagari and major Indic scripts. For best results with rare scripts, consider Gemini which explicitly supports CJK, Devanagari, Arabic, and other scripts.
   - This is a pipeline bug if violated. Stop and fix.
-- TOKEN LIMIT: Keep prompt under 400 tokens. The Camera/Technical layer adds ~40-80 tokens. Total must still be under 400.
 - NO CHECKLISTS in generated images
 - NO SPECIFIC FONTS requested
 
@@ -437,7 +434,6 @@ MANDATORY PRE-GENERATION CHECKLIST (Gate-Blocking):
 - [ ] Prompt describes MOOD, not UI
 - [ ] At most 2 visual anchors per side
 - [ ] Image text matches copy variant language
-- [ ] Prompt under 400 tokens
 - [ ] No checklist/checkmark UI elements
 - [ ] No specific fonts
 - [ ] Emotional contrast explicit
@@ -492,7 +488,6 @@ If images are generated via the `content-generation-executor` agent instead of t
            "prompt_has_camera_technical": True,
            "prompt_has_shot_type": True,
            "prompt_has_lighting_pattern": True,
-           "prompt_under_400_tokens": True,
            "files_generated": N,
        },
        artifact_paths=[Path("[project_path]/artifacts/asset_manifest.json"), ...],
@@ -590,7 +585,7 @@ These rules exist because the pipeline previously produced bad output. Enforce t
 **Your job as orchestrator:** After the assets subagent produces a prompt, verify:
 - Does it describe MOOD or UI? (Must be mood)
 - Are there ≤2 visual anchors per side? (More = over-specified)
-- Is the prompt under 400 tokens? (Longer = less creative)
+- Is the prompt efficiently written without unnecessary verbosity?
 
 **If any check fails:** Send the subagent back with: "Rewrite prompt using Visual Brief pattern. Remove UI specs. Focus on mood and emotional contrast."
 
@@ -717,7 +712,7 @@ Recommendation: [option N] because [reason]
 
 ## Project Directory Convention
 
-Each orchestrated run creates a project workspace. The root path is determined by `company_context.paths.project_root` from the company profile (e.g., `company_profiles/91astrology.json`).
+Each orchestrated run creates a project workspace. The root path is determined by `company_context.paths.project_root` from the company profile (e.g., `../company_profiles/91astrology.json`).
 
 **Path Resolution Rule:**
 - Read `company_context.paths.project_root` from the company profile

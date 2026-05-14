@@ -10,37 +10,54 @@ Your job is to orchestrate the entire `marketing-creative` pipeline from start t
 
 ## Architecture: How This Works
 
-The OpenMontage framework supports two execution modes. This skill covers **both**.
+The OpenMontage framework supports three execution modes. This skill covers **all**.
 
-### Mode A: Self-Execution (Default)
-You (the AI agent) read the pipeline manifest and stage director skills, then execute each stage yourself using tools. No subagents are spawned. You are the orchestrator and the executor.
+### Mode C: Agent-Native Deterministic (NEW — Default, Recommended)
+You (the AI agent) read a single driver skill and execute the entire pipeline in one continuous session. No CLI calls. No `--resume` loop. The agent IS the orchestrator.
 
 ```
-User picks idea → You read EP skill → You read stage skill → You execute stage → Checkpoint → Next stage
+User says "run campaign" → You read agent-pipeline-driver.md → Execute all stages sequentially → Present deliverables
 ```
 
-**Use self-execution when:**
+**Use agent-native when:**
 - Processing a single campaign
 - Context window is healthy (< 50% used)
-- Stages are straightforward (copy + image generation)
+- You want the fastest, most reliable execution
 
-### Mode B: Subagent Spawning
-You (the AI agent) act as the orchestrator. For each stage, you spawn a dedicated subagent via the `Agent` tool with `subagent_type: general-purpose`. The subagent reads the stage skill, executes it, and returns results. You validate output, write checkpoints, and decide whether to proceed.
+**How it works:**
+1. Read `skills/pipelines/marketing-creative/agent-pipeline-driver.md`
+2. Initialize session via `python -c "from pipelines.marketing_creative.agent_utils import init_session; ..."`
+3. For each stage in the deterministic sequence:
+   - Check completion via `agent_utils.is_stage_complete()`
+   - Read the stage director skill
+   - Load inputs, execute creative work, write outputs
+   - Mark complete via `agent_utils.mark_stage_complete()`
+4. For assets stage: generate images via OpenMontage Python tools
+5. Present deliverables
+
+**Key difference from Mode A:** No `--resume` CLI calls. The agent drives everything.
+
+### Mode A: Self-Execution with CLI Loop (Legacy)
+You call the Python orchestrator CLI to get stage instructions, then call `--resume` between stages.
 
 ```
-User picks idea → You lock brief → Spawn research subagent → Review → Checkpoint
-                                    Spawn creative subagent → Review → Checkpoint
-                                    Spawn copy subagent → Review → Checkpoint
-                                    Spawn assets subagent → Review → Checkpoint
-                                    Spawn review subagent → Final checkpoint
+User picks idea → You call Python orchestrator → You read stage skill → You execute stage → Call Python resume → Next stage
 ```
 
-**Use subagent mode when:**
-- Processing multiple campaigns (see Batch Multi-Campaign Protocol in orchestrator skill)
-- A stage requires deep isolated context (e.g., research with web search)
-- You want parallel execution of independent stages (rare — most stages are sequential)
+**Use when:** You need the orchestrator to manage complex state or want to pause between stages.
 
-**IMPORTANT:** Do not mix modes within a single campaign. Pick one mode at the start and stick with it for the entire pipeline. Switching modes mid-pipeline causes checkpoint inconsistency.
+**How it works:**
+1. Call `python -m pipelines.marketing_creative --self-execution ...`
+2. Read stage skill, execute, write outputs
+3. Call `python -m pipelines.marketing_creative --resume --self-execution ...`
+4. Repeat until complete
+
+### Mode B: Subagent Spawning (Deprecated, Do Not Use)
+You spawn dedicated subagents via the `Agent` tool. **This mode is unreliable.** Kimi does not support subagent spawning. It is kept for backward compatibility only.
+
+**WARNING:** Subagent mode causes permission prompts, context fragmentation, and infinite resume loops.
+
+**IMPORTANT:** Use Mode C (Agent-Native) for all new campaigns. Mode A is acceptable for debugging. Do not use Mode B.
 
 ## Pipeline Flow
 
@@ -75,8 +92,9 @@ print(json.dumps(registry.provider_menu_summary(), indent=2))
 ```
 
 Check specifically for:
-- `image_selector` or concrete image tools (`openai_image`, `google_imagen`, etc.)
+- `image_selector` or concrete image tools (`flux_image`, etc.)
 - Budget tracker availability
+- API key status (loaded from `.env`)
 
 Report capability summary to user.
 
@@ -138,15 +156,24 @@ Track spend at every generation step:
 
 | Tool | Cost per call |
 |---|---|
-| `openai_image` (gpt-image-2, high, 1024x1024) | ~$0.167 |
-| `google_imagen` | Varies by model |
-| `gemini_image` | Varies by model |
+| `flux_image` (flux-pro/v1.1, 1024x1024) | ~$0.05 |
+| `flux_image` (flux/dev, 1024x1024) | ~$0.03 |
+| `image_selector` (auto-routed) | Varies by selected provider |
 
 Before generating:
-1. Estimate total cost for the selected variant
+1. Estimate total cost for the selected variant (check `tool.estimate_cost()`)
 2. Check against pipeline budget (`orchestration.budget_default_usd`)
-3. If over budget: switch to cheaper provider via `image_selector`
+3. If over budget: switch to cheaper provider (e.g., FLUX dev tier)
 4. Announce cost before generating
+
+Example cost check:
+```python
+from tools.tool_registry import registry
+registry.discover()
+selector = registry.get("image_selector")
+cost = selector.estimate_cost({"prompt": "...", "width": 1024, "height": 1024})
+print(f"Estimated cost: ${cost}")
+```
 
 ### Step 6: Human Approval Gates
 
@@ -164,10 +191,11 @@ Before generating:
 
 | Scenario | Action |
 |---|---|
-| Image generation fails | Log error, try fallback provider via `image_selector`, report to user |
+| Image generation fails | Log error, try fallback provider via `image_selector`, or switch concrete tool (e.g., flux_image). Report to user. |
 | Language propagation fails | CRITICAL. Stop. Flag pipeline bug. Do not proceed. |
-| Budget exceeded | Stop. Present options: reduce scope, switch provider, or increase budget. Wait for user. |
+| Budget exceeded | Stop. Present options: reduce scope, switch to cheaper provider (FLUX dev), or increase budget. Wait for user. |
 | User rejects a stage artifact | Revise per reviewer feedback. Max 3 revisions per stage. |
+| API key missing | Check `.env` file. Run preflight to see which providers are available. |
 
 ### Step 8: Pipeline Completion
 
@@ -187,7 +215,7 @@ When user says: **"Run idea-01 through the pipeline"**
 3. research → creative_concept → copy → assets → review
 4. At each approval gate: present summary, wait for OK
 5. In assets stage: select pain_point + primary_language by default (from company_context)
-6. Generate image using Visual Brief + openai_image (gpt-image-2)
+6. Craft Visual Brief prompt and generate image via Python tools (`image_selector` or `flux_image`)
 7. Review and present final output
 ```
 
@@ -206,7 +234,8 @@ If the user asks for N > 2 campaigns:
 **The OpenMontage framework is instruction-driven, not autonomous.** These steps require the AI agent to read skills and make decisions:
 
 - Reading and interpreting the idea pool
-- Executing each stage per its director skill (self-execution mode) or spawning subagents (subagent mode)
+- Executing each stage per its director skill (self-execution mode)
+- Running Python scripts for image generation (not agent built-in tools)
 - Making creative judgments (which angle, which language)
 - Getting user approvals at checkpoints
 - Handling errors and fallbacks
@@ -219,6 +248,7 @@ If the user asks for N > 2 campaigns:
 Before claiming the pipeline is ready, verify these exist:
 
 - [ ] `pipeline_defs/marketing-creative.yaml`
+- [ ] `skills/pipelines/marketing-creative/agent-pipeline-driver.md` (**agent-native execution skill**)
 - [ ] `skills/pipelines/marketing-creative/executive-producer.md` (this file)
 - [ ] `skills/pipelines/marketing-creative/research-director.md`
 - [ ] `skills/pipelines/marketing-creative/creative-director.md`

@@ -59,7 +59,7 @@ For every asset:
 - [ ] No garbled or misspelled text
 - [ ] Visual contrast is clear and compelling
 - [ ] Lighting and mood match the creative spec
-- [ ] Prompt was under 400 tokens (check prompt log)
+- [ ] Prompt is efficiently written and mood-driven (check prompt log)
 
 ### Copy Quality
 

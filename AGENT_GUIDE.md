@@ -60,11 +60,11 @@ When the user mentions **marketing campaigns, ad creatives, copy variants, or ru
 
 ### Required behavior
 
-1. **Read:** `.agents/skills/marketing-creative-orchestrator/SKILL.md`
-2. **Follow the orchestrator skill** — it defines idea discussion, subagent spawning, steering rules, and the full execution flow
+1. **Read:** `MARKETING_CREATIVE_RUNNER.md` (repo root)
+2. **Follow the automated runner** — it handles the full end-to-end loop: runs the Python CLI, spawns subagents per stage, auto-resumes between stages, and presents final deliverables
 3. **Do NOT fall back to video pipelines** (animated-explainer, cinematic, etc.) for marketing creative requests
 
-The orchestrator handles: research → creative_concept → copy → assets → review, spawning a specialized subagent per stage and steering their outputs using Visual Brief rules and language propagation enforcement.
+The runner automates: input processing → creative_concept → copy → assets → review (with optional research). Research is skipped by default. The runner spawns a specialized subagent per stage and handles the resume loop automatically. The user provides the idea and sees the final deliverables — no manual `--resume` commands needed.
 
 ## Rule Zero — All Production Goes Through a Pipeline
 

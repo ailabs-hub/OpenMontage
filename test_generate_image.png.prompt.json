@@ -1,0 +1,43 @@
+{
+  "tool": "openai_image",
+  "tool_version": "0.1.0",
+  "provider": "openai",
+  "model": "gpt-image-2",
+  "generated_at_utc": "2026-05-14T09:39:18.625752+00:00",
+  "duration_seconds": 271.22,
+  "request": {
+    "user_prompt": "A serene astrological chart with golden light",
+    "size": "1024x1024",
+    "quality": null,
+    "output_format": "png",
+    "n": 1
+  },
+  "openai_revised_prompt": null,
+  "raw_response_metadata": {
+    "created": 1778751556,
+    "background": "opaque",
+    "output_format": "png",
+    "quality": "high",
+    "size": "1024x1024",
+    "usage": {
+      "input_tokens": 14,
+      "input_tokens_details": {
+        "image_tokens": 0,
+        "text_tokens": 14
+      },
+      "output_tokens": 7024,
+      "total_tokens": 7038,
+      "output_tokens_details": {
+        "image_tokens": 7024,
+        "text_tokens": 0
+      }
+    },
+    "data": [
+      {
+        "revised_prompt": null,
+        "url": null
+      }
+    ]
+  },
+  "image_path": "test_generate_image.png"
+}

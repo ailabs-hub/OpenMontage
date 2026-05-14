@@ -26,7 +26,7 @@ When generating prompts for advertising campaigns, use this tagged structure to 
 [STYLE: [photorealistic/cinematic/advertising aesthetic]]
 ```
 
-**Why this matters:** GPT Image 2 and Gemini use the Camera/Technical layer to render depth of field, bokeh, film grain, and color science. Without it, images look flat and generic. The total prompt should still be under 400 tokens.
+**Why this matters:** GPT Image 2 and Gemini use the Camera/Technical layer to render depth of field, bokeh, film grain, and color science. Without it, images look flat and generic. Write the prompt as efficiently as possible — concise prompts tend to preserve creative freedom.
 
 ### Basic Formula
 ```

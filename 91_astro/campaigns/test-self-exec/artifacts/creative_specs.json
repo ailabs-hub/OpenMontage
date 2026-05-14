@@ -1,0 +1,23 @@
+﻿{
+    "idea_id":  "test-idea",
+    "version":  "1.0",
+    "idea_name":  "Test",
+    "creatives":  [
+                      {
+                          "visual_direction":  "Warm",
+                          "creative_name":  "Test",
+                          "hook_type":  "pain_point",
+                          "placement":  [
+                                            "Instagram"
+                                        ],
+                          "budget_guidance":  "",
+                          "primary_hook":  "Test",
+                          "format":  "Image 1:1",
+                          "cta_primary":  "Buy",
+                          "cta_secondary":  "Learn",
+                          "audience":  "Test",
+                          "expected_ctr":  "1%",
+                          "creative_id":  "CR-01"
+                      }
+                  ]
+}

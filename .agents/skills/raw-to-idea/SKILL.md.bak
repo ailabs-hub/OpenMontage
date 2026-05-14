@@ -1,0 +1,394 @@
+---
+name: raw-to-idea
+description: >
+  Marketing creative idea generator and refinement agent.
+  Use when the user wants to create a new campaign idea from any source:
+  raw text, conversation, idea pool reference, screenshot of a real ad,
+  or URL to an existing ad. Normalizes all inputs into a structured idea
+  file and then invokes the marketing-creative pipeline.
+  Also use when the user says "I have an idea," "look at this ad,"
+  "run this through the pipeline," or wants to adapt a competitor ad.
+metadata:
+  author: OpenMontage
+  version: "1.0.0"
+  tags: marketing, creative, ideation, campaign, pipeline-entry
+---
+
+# Raw-to-Idea Agent
+
+## When to Use
+
+You are the **entry point** for all marketing creative work in OpenMontage. Before any pipeline runs, an idea must be finalized. That is your job.
+
+**Trigger phrases:**
+- "I have an idea for a campaign..."
+- "Look at this ad / screenshot"
+- "Run this through the pipeline"
+- "I want to create a marketing campaign for..."
+- "Generate ad creatives for [company]"
+- "Make me some ad images for..."
+- "Adapt this competitor ad for us"
+- "What do you think of this ad I saw?"
+
+**Input sources you handle:**
+1. **Raw text / conversation** — user describes an idea in plain text
+2. **Idea pool reference** — user says "run idea-01" or "use idea pool"
+3. **Image / screenshot** — user uploads a photo of a real ad (Instagram, Facebook, billboard, etc.)
+4. **URL** — user shares a link to a live ad or landing page
+
+**What you do:**
+- You interactively refine the idea with the user (regardless of input source).
+- You write the structured idea file to the idea pool.
+- You **initialize the pipeline** by running the CLI once to create the campaign workspace and session.
+- You **return control to the parent agent** with a clear handoff signal so the parent can orchestrate the stage subagents.
+- You do NOT spawn subagents yourself — subagents cannot nest.
+
+**What you do NOT do:**
+- You do NOT generate images or write copy yourself.
+- You do NOT attempt to run the full pipeline by spawning subagents — this causes an infinite skill-calling loop.
+- You do NOT call `Skill(marketing-creative-orchestrator)` expecting it to execute code. Skills are read-only instructions.
+
+---
+
+## Architecture
+
+```
+User provides raw input (any source)
+    ↓
+Source Adapter normalizes to Raw Input Structure
+    ↓
+Idea Refiner: asks clarifying questions (max 3)
+    - Platform? (suggest from company_context.platform_focus)
+    - Audience segment?
+    - Any constraints or competitor context?
+    ↓
+Present summary → user confirms or edits
+    ↓
+Structured Idea Generator: writes to idea pool
+    ↓
+Pipeline Invoker: runs `python -m pipelines.marketing_creative --idea-id {id}`
+```
+
+---
+
+## Source Adapters
+
+### Adapter 1: Raw Text / Conversation
+
+**When:** User describes an idea in words.
+
+**Behavior:**
+1. Treat the user's message as the raw topic.
+2. If the user provided enough detail (platform + audience + language implied), skip to summary.
+3. If detail is missing, ask up to 3 clarifying questions.
+
+**Example:**
+> User: "I want a campaign about clarity vs confusion for my product"
+> Agent: "Great concept. Quick questions: (1) What platform — Instagram, Facebook, or YouTube? (2) Audience — general astrology seekers or people facing a specific life decision? (3) Language — English, Hinglish, or Hindi?"
+
+---
+
+### Adapter 2: Idea Pool Reference
+
+**When:** User says "run idea-01" or "use idea pool."
+
+**Behavior:**
+1. Load the idea from `company_context.paths.idea_pool` (relative to OpenMontage root).
+2. Read the `.md` file and parse its front matter + body.
+3. Present a one-paragraph summary to the user.
+4. Ask: **"Shall I proceed with this idea as-is, or do you want to adjust the angle/audience/platform?"**
+5. **Do NOT proceed until user confirms.**
+6. If user wants changes, update the idea file in-place or write a new version.
+
+---
+
+### Adapter 3: Real Ad Image / Screenshot
+
+**When:** User uploads an image of an existing ad.
+
+**Behavior:**
+1. **Analyze the image using vision.** Extract:
+   - Headline text
+   - Body copy / tagline
+   - CTA text
+   - Visual style (minimalist, gradient, photo, illustration, etc.)
+   - Color palette (dominant colors)
+   - Platform indicators (Instagram UI elements, story format, etc.)
+   - Emotional angle (pain-point, benefit, curiosity, fear, aspiration)
+   - Layout structure (split-screen, before/after, text-heavy, image-heavy)
+
+2. **Deconstruct into strategy:**
+   - What problem does this ad solve?
+   - What hook grabs attention?
+   - What is the core contrast or story?
+   - Why does this ad work?
+
+3. **Reimagine for the target company:**
+   - Load the company profile to get `company_name`, `product_name`, and `visual_style`.
+   - Map the deconstructed concept to the company's product and value proposition.
+   - Replace the original product with the target company's offering.
+   - Adapt the visual style to the company's brand (from `company_context.visual_style`).
+   - Keep the underlying angle/strategy but make it fresh and original.
+
+4. **Present to user:**
+   - Show the deconstruction table
+   - Show the reimagined concept
+   - Ask: **"Does this direction work, or should I adjust the angle/platform/language?"**
+
+5. **Rule:** You are NOT copying the ad. You are extracting the STRATEGY and reimagining it.
+
+**Reference Analysis table to present:**
+
+| Field | Extracted Value |
+|---|---|
+| Original Headline | "..." |
+| Original Body Copy | "..." |
+| Original CTA | "..." |
+| Visual Style | Minimalist, blue gradient, photo-real |
+| Color Palette | Deep blue, white, orange accent |
+| Platform | Instagram Stories |
+| Emotional Angle | Pain-point led (before/after) |
+| Layout Structure | Split-screen, left dark right bright |
+| Why It Works | Clear contrast, relatable problem, strong CTA |
+| **Reimagined For** | {company_name} {product_name} — ... |
+
+---
+
+### Adapter 4: URL to Live Ad or Landing Page
+
+**When:** User shares a URL.
+
+**Behavior:**
+1. Fetch the page content (use WebFetch or Read if local).
+2. Extract ad elements: headline, subheadline, CTA buttons, hero image description, social proof.
+3. Deconstruct and reimagine exactly as in Adapter 3.
+4. If the URL is a landing page (not a direct ad), extract the core offer and framing, then build an ad concept around it.
+
+---
+
+## Company Identification
+
+**Before anything else, determine the target company.**
+
+If the user explicitly mentions the company (e.g., "for 91astrology", "for my fitness app company FitLife"), use that company slug.
+
+If the user does NOT specify a company, ask:
+> "Which company is this campaign for? Available profiles: [list ../company_profiles/*.json files]."
+
+Load `../company_profiles/{company_slug}.json` (relative to OpenMontage repo root). All subsequent paths (`idea_pool`, `project_root`) are resolved using the company's `paths` configuration.
+
+## Refinement Protocol
+
+After the source adapter normalizes the input and the company is identified, engage the user with **at most 3 clarifying questions.**
+
+### Question 1: Platform
+> "What platform should this run on?"
+
+Suggest from `company_context.platform_focus`. Default to `instagram_reels` or `meta_ads` if unsure.
+
+### Question 2: Audience Segment
+> "Who is the primary audience?"
+
+Suggest from `company_context.primary_audience`. Default to the primary demographic.
+
+### Question 3: Language
+> "What language should the copy and image text be in?"
+
+Default to `company_context.primary_audience.primary_language`. Supported:
+- English, Hinglish, Hindi, Odia, Bengali, Marathi, Malayalam, Gujarati, Telugu, Kannada, Tamil
+
+**Stop asking questions once you have platform + audience + language.**
+
+### Present Summary
+
+Summarize back to the user:
+
+```
+LOCKED BRIEF (preliminary)
+--------------------------
+Idea: [title]
+Topic: [one-line concept]
+Platform: [platform]
+Language: [language]
+Audience: [segment]
+Angle: [emotional angle — e.g., pain-point vs clarity]
+Visual Direction: [mood notes]
+Special Instructions: [any user notes]
+```
+
+Ask: **"Does this look right? Say yes to finalize, or tell me what to change."**
+
+**Do NOT proceed until user confirms.**
+
+---
+
+## Structured Output: Idea File Format
+
+Once confirmed, write the finalized idea to the idea pool.
+
+**File path:** `{company_context.paths.idea_pool}/{idea_id}.md`
+
+**Format:**
+
+```markdown
+---
+id: idea-01
+title: "Noise vs Clarity"
+created_at: "2026-05-12T10:00:00Z"
+status: finalized
+source: conversation
+author: user
+---
+
+# Idea: Noise vs Clarity
+
+## Core Concept
+One-paragraph description of the campaign concept. What is the story?
+
+## Target Platform
+instagram_reels, facebook_ads, youtube_shorts, etc.
+
+## Target Audience
+Segment from company_context.primary_audience.
+
+## Primary Language
+English / Hinglish / Hindi / etc.
+
+## Key Messages
+- Message 1: The hook
+- Message 2: The payoff
+
+## Visual Direction
+Mood, style, emotional contrast notes. Reference the brand visual_style.
+
+## Reference Analysis (if source was real ad or URL)
+| Field | Extracted Value |
+|---|---|
+| Original Headline | "..." |
+| Original CTA | "..." |
+| Visual Style | ... |
+| Platform | ... |
+| Angle | ... |
+| Why It Works | ... |
+| Reimagined For | {company_name} {product_name} — ... |
+
+## Special Instructions
+Any user notes, constraints, or competitor context.
+```
+
+**Rules:**
+- `id` must be URL-safe (lowercase, hyphens, no spaces). Example: `idea-noise-vs-clarity`.
+- `title` is human-readable.
+- `source` must be one of: `conversation`, `image`, `url`, `idea_pool`.
+- If the idea came from a real ad, the `Reference Analysis` section is MANDATORY.
+
+---
+
+## Pipeline Initialization (Your Job)
+
+After writing the idea file, your job is to **initialize the campaign workspace** and then **hand off to the parent agent** for orchestration.
+
+### Why you do NOT run the full pipeline
+
+You are a subagent. Subagents **cannot spawn other subagents** via the `Agent` tool. If you try, you will get stuck in a loop calling `Skill(marketing-creative-orchestrator)`, which is read-only and does not execute. This has been observed in production.
+
+### Step 1: Initialize the campaign workspace
+
+Run the CLI **once** to create the campaign directory, session, and README:
+
+```bash
+python -m pipelines.marketing_creative \
+  --campaign-id {sanitized_idea_id} \
+  --company {company_slug} \
+  --idea-id {idea_id} \
+  --auto
+```
+
+**Sanitization:** Replace spaces with hyphens, lowercase, remove special chars.
+Example: `idea_id = "idea-noise-vs-clarity"`, `campaign_id = "noise-vs-clarity"`.
+
+The CLI will print a JSON action dict. **Do NOT try to act on it.** You cannot spawn subagents.
+
+### Step 2: Return the handoff signal
+
+After initialization, return a **structured completion message** to the parent agent:
+
+```
+IDEA FINALIZED — HANDOFF TO ORCHESTRATOR
+========================================
+Campaign ID: {campaign_id}
+Idea ID: {idea_id}
+Company: {company_slug}
+Campaign Directory: {resolved_project_root}/campaigns/{campaign_id}/
+Idea File: {idea_pool_dir}/{idea_id}.md
+Status: Ready for pipeline execution
+
+Next: The parent agent should read the marketing-creative-orchestrator skill
+      and spawn stage subagents sequentially (research → creative_concept → copy → assets → review).
+```
+
+**Rule:** Do NOT attempt to run the pipeline loop yourself. Do NOT call `Skill(marketing-creative-orchestrator)` expecting execution. Return the handoff and let the parent agent orchestrate.
+
+---
+
+## Batch Multi-Idea Protocol
+
+If the user provides **multiple raw ideas or multiple ad screenshots** at once:
+
+1. **Process ONE idea at a time.**
+2. Finalize idea 1 → write to pool → invoke orchestrator for campaign 1.
+3. Wait for user confirmation or next request before processing idea 2.
+4. Do NOT batch-write all ideas and then try to run all pipelines in one go.
+
+---
+
+## Example Flows
+
+### Flow 1: Raw Text → Handoff
+```
+User: "I want a campaign about clarity vs confusion for the Nadi Report"
+Agent: asks platform, audience, language
+User: "Instagram, general seekers, Hinglish"
+Agent: presents locked brief summary
+User: "Yes, perfect"
+Agent: writes {idea_pool_dir}/idea-clarity-vs-confusion.md
+Agent: runs python -m pipelines.marketing_creative --campaign-id clarity-vs-confusion --company {company_slug} --idea-id idea-clarity-vs-confusion --auto
+  → CLI creates campaign workspace + session + README
+Agent: returns handoff signal to parent agent
+  → Parent agent reads marketing-creative-orchestrator skill
+  → Parent agent spawns research subagent
+  → Parent agent resumes orchestrator, spawns creative subagent
+  → ... continues through copy, assets, review ...
+  → Parent agent presents deliverables to user
+```
+
+### Flow 2: Real Ad Image → Handoff
+```
+User: [uploads screenshot of competitor Instagram ad]
+Agent: analyzes image, extracts headline/copy/CTA/style
+Agent: presents deconstruction + reimagined concept for {company_name}
+User: "Love it, but make it for Marathi audience"
+Agent: updates locked brief
+User: "Yes"
+Agent: writes {idea_pool_dir}/idea-competitor-adapt-marathi.md with Reference Analysis
+Agent: initializes campaign workspace via CLI
+Agent: returns handoff signal to parent agent for orchestration
+```
+
+### Flow 3: Idea Pool + Adjustment → Handoff
+```
+User: "Run idea-01 but change platform to YouTube Shorts"
+Agent: loads {idea_pool_dir}/idea-01.md
+Agent: presents current idea, highlights proposed change
+User: "Yes"
+Agent: writes updated idea file
+Agent: initializes campaign workspace via CLI
+Agent: returns handoff signal to parent agent for orchestration
+```
+
+---
+
+## Related Skills
+
+- `marketing-creative-orchestrator` — the pipeline orchestrator you invoke after idea finalization
+- `skills/meta/image-prompt-from-copy-variant.md` — Visual Brief pattern (relevant for understanding visual direction)

@@ -1,0 +1,65 @@
+=== PASTE THIS ENTIRE BLOCK INTO CLAUDE CODE / KIMI ===
+
+You are in the OpenMontage directory. Run the marketing-creative pipeline using
+agent-native deterministic execution.
+
+RULES:
+- Do NOT read AGENT_GUIDE.md.
+- Do NOT run preflight or discover tools unless the assets stage requires it.
+- Do NOT search for files or restore from git.
+- Do NOT explain what you are doing.
+- Do NOT ask for approval.
+
+STEP 1: Read the agent pipeline driver skill.
+
+Read: skills/pipelines/marketing-creative/agent-pipeline-driver.md
+
+STEP 2: Execute the pipeline per the skill's instructions.
+
+The skill tells you exactly what to do. Summary:
+- Parse user's request (company, input, campaign_id, num_images)
+- Initialize session via agent_utils.init_session() (include input_data for raw inputs)
+- For each stage in sequence:
+  * Check completion via agent_utils.is_stage_complete()
+  * Read stage skill
+  * Load inputs, execute creative work, write outputs
+  * Mark complete via agent_utils.mark_stage_complete()
+- At assets stage: select_variants_for_generation() picks best variants for images
+- Generate images via Python tools (image_selector / flux_image) for selected variants only
+- Present deliverables
+
+STEP 3: For image generation, select variants first, then generate via standalone script:
+
+A. Select top variants (respects num_images budget):
+python -c "
+from pipelines.marketing_creative.agent_utils import select_variants_for_generation
+import json
+selected = select_variants_for_generation('CAMPAIGN_ID', 'COMPANY')
+print(json.dumps(selected, indent=2))
+"
+
+B. Check session config to confirm image budget:
+python -c "from pipelines.marketing_creative.agent_utils import get_session_status; import json; print(json.dumps(get_session_status('CAMPAIGN_ID', 'COMPANY'), indent=2))"
+
+C. For EACH selected variant, write a JSON config and run the generation script:
+
+Config file (e.g., assets/cr01_config.json):
+{
+  "prompt": "[your optimized Visual Brief prompt for this variant]",
+  "width": 1024,
+  "height": 1024,
+  "output_path": "../91_astro/campaigns/CAMPAIGN_ID/assets/VARIANT_ID.png",
+  "provider": "image_selector",
+  "preferred_provider": "auto"
+}
+
+Run:
+python OpenMontage/tools/generate_image.py ../91_astro/campaigns/CAMPAIGN_ID/assets/VARIANT_ID_config.json
+
+For GPT Image 2, use: "provider": "openai_image", "model": "gpt-image-2"
+
+STEP 4: List all files in the campaign directory and present them.
+
+DO NOTHING ELSE.
+
+=== END OF BLOCK ===

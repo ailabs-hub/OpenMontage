@@ -26,6 +26,7 @@ from schemas.artifacts import ARTIFACT_NAMES, validate_artifact
 ALL_KNOWN_STAGES = frozenset([
     "research", "proposal", "idea", "script", "scene_plan",
     "assets", "edit", "compose", "publish",
+    "idea_refinement", "creative_concept", "copy", "review",
 ])
 
 # Backward-compatible alias — existing code / tests that import STAGES still work.
@@ -34,6 +35,7 @@ STAGES = ["research", "proposal", "idea", "script", "scene_plan",
           "assets", "edit", "compose", "publish"]
 
 CANONICAL_STAGE_ARTIFACTS = {
+    "idea_refinement": "idea_file",
     "research": "research_brief",
     "proposal": "proposal_packet",
     "idea": "brief",
@@ -43,6 +45,9 @@ CANONICAL_STAGE_ARTIFACTS = {
     "edit": "edit_decisions",
     "compose": "render_report",
     "publish": "publish_log",
+    "creative_concept": "creative_specs",
+    "copy": "copy_manifest",
+    "review": "final_review",
 }
 
 # Additional artifacts that may be produced alongside canonical ones.

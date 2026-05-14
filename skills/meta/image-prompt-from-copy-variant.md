@@ -170,7 +170,7 @@ Before generating the image, verify:
 - [ ] The prompt describes MOOD, not UI elements
 - [ ] The prompt has at most 2 visual anchors per side
 - [ ] Image text overlays match the copy variant language
-- [ ] The prompt is under 400 tokens (shorter prompts preserve creativity)
+- [ ] The prompt is concise and efficiently written (shorter prompts tend to preserve creativity, but there is no hard token limit)
 - [ ] No checklist/checkmark UI elements are specified
 - [ ] No specific fonts are requested
 - [ ] Emotional contrast is explicit in the prompt
@@ -189,7 +189,7 @@ Extract emotional core + key phrases + lock language
     ↓
 Generate Visual Brief (mood + anchors + locked language text)
     ↓
-Craft image prompt (< 400 tokens, emotional, not prescriptive)
+Craft image prompt (emotional, not prescriptive — concise is preferred but not enforced)
     ↓
 Generate image (gpt-image-2, high quality)
     ↓
@@ -248,16 +248,14 @@ When using `gpt-image-2` (the default for 91Astrology campaigns):
 2. **Named lighting patterns work.** "Rembrandt lighting", "golden hour", "volumetric light" all produce visible effects.
 3. **Hex color codes are respected.** Include `#RRGGBB` values for palette precision.
 4. **Text rendering:** Handles Devanagari (Hindi, Marathi) and major Indic scripts well. Always specify the script explicitly: "text overlay in Marathi script".
-5. **Token budget:** The Camera/Technical layer adds ~40-80 tokens. Total prompt should still be under 400 tokens.
-
-### Verification Checklist (Updated)
+5. ### Verification Checklist (Updated)
 
 Before generating the image, verify:
 
 - [ ] The prompt describes MOOD, not UI elements
 - [ ] The prompt has at most 2 visual anchors per side
 - [ ] Image text overlays match the copy variant language
-- [ ] The prompt is under 400 tokens (shorter prompts preserve creativity)
+- [ ] The prompt is concise and efficiently written (shorter prompts tend to preserve creativity, but there is no hard token limit)
 - [ ] No checklist/checkmark UI elements are specified
 - [ ] No specific fonts are requested
 - [ ] Emotional contrast is explicit in the prompt

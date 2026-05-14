@@ -96,6 +96,18 @@
             "type": "array",
             "items": { "type": "string" }
           },
+          "gate": {
+            "type": "object",
+            "description": "Non-bypassable validation gate for this stage",
+            "properties": {
+              "gate_id": { "type": "string" },
+              "required": { "type": "boolean", "default": true },
+              "validation_fields": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
           "sub_stages": {
             "type": "array",
             "description": "Optional sub-stages within a stage (e.g., sample preview for reference-driven productions)",
@@ -138,10 +150,13 @@
       "properties": {
         "mode": { "type": "string" },
         "skill": { "type": "string" },
+        "script": { "type": "string", "description": "Path to code-level orchestrator script" },
         "budget_default_usd": { "type": "number" },
         "max_revisions_per_stage": { "type": "integer" },
         "max_send_backs": { "type": "integer" },
-        "max_wall_time_minutes": { "type": "integer" }
+        "max_wall_time_minutes": { "type": "integer" },
+        "max_campaigns_per_invocation": { "type": "integer" },
+        "context_budget_per_campaign": { "type": "string" }
       },
       "additionalProperties": false
     },

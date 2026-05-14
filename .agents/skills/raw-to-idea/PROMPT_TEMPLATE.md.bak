@@ -1,0 +1,73 @@
+# Standard Input Prompt Template
+
+Use this exact prompt every time you start a campaign. Replace the `[COMPANY]` and `[IDEA_PLACEHOLDER]` parts.
+
+---
+
+## Template
+
+```
+@raw-to-idea Run this through the pipeline for [COMPANY]:
+
+[IDEA_PLACEHOLDER]
+```
+
+---
+
+## Examples
+
+### 1. Raw text idea
+```
+@raw-to-idea Run this through the pipeline for 91astrology:
+
+A campaign about clarity vs confusion for the Nadi Report — showing how people feel lost in life decisions until they get their personalized Nadi reading.
+```
+
+### 2. Image of a real ad
+```
+@raw-to-idea Run this through the pipeline for 91astrology:
+
+[upload image screenshot]
+
+This is a competitor ad I saw on Instagram. Deconstruct it and reimagine the strategy for our Nadi Report.
+```
+
+### 3. URL to a live ad
+```
+@raw-to-idea Run this through the pipeline for mycompany:
+
+https://www.example.com/landing-page
+
+Analyze this landing page and build an ad campaign concept around their core offer, adapted for our product.
+```
+
+### 4. Idea pool reference
+```
+@raw-to-idea Run this through the pipeline for 91astrology:
+
+Use idea-01 from the idea pool. I want to keep the core concept but change the platform to YouTube Shorts and language to Hindi.
+```
+
+### 5. Research-first approach
+```
+@raw-to-idea Run this through the pipeline for 91astrology:
+
+I want to run a campaign about [TOPIC]. Before we build the creative, do the research phase first — I want to see what signals, competitors, and audience insights you find before we commit to a creative direction.
+```
+
+---
+
+## What happens next
+
+1. The raw-to-idea agent identifies the company from your prompt
+2. Loads the company profile from `../company_profiles/{company}.json` (relative to OpenMontage repo root)
+3. Reads your input (text, image, or URL)
+4. Asks up to 3 clarifying questions
+5. Locks the brief after your confirmation
+6. Writes the idea to `{company_paths.idea_pool}/`
+7. Initializes the campaign workspace (session, README, directories)
+8. **Hands off to the main agent** to orchestrate the pipeline stages:
+   - research → creative_concept → copy → assets → review
+9. The main agent spawns specialized subagents per stage and presents final deliverables
+
+You do nothing else.

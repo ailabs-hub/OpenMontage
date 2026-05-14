@@ -21,7 +21,7 @@ This is where copy becomes visual. A bad prompt here produces generic infographi
 | Typography skill | `.agents/skills/flux-best-practices/rules/typography-text.md` | **MANDATORY** — Text rendering optimization. |
 | Model selection | `.agents/skills/flux-best-practices/rules/model-selection-guide.md` | **MANDATORY** — Provider selection (GPT Image 2 vs Gemini vs FLUX). |
 | Prior artifacts | `state.artifacts["copy"]["copy_manifest"]` (selected variant), `state.artifacts["creative_concept"]["creative_specs"]` | What to produce |
-| Tools | `image_selector`, `openai_image`, `google_imagen`, `gemini_image`, `seedream_image` — selectors auto-discover providers | Generation capabilities |
+| Tools | **Python-based OpenMontage tools** — `image_selector`, `flux_image`, etc. Run via Python scripts, not agent built-in tools | Generation capabilities |
 | Cost tracker | `tools/cost_tracker.py` | Budget governance |
 
 ## MANDATORY: Skill Reading Protocol
@@ -92,17 +92,47 @@ If you skip this meta skill, you WILL produce flat infographic ads with wrong-la
 
 ## Process
 
-### Step 1: Select the Copy Variant
+### Step 0: Intelligent Variant Selection
 
-You should have one selected copy variant:
+You do NOT generate images for every copy variant. The pipeline uses an intelligent selection system that scores all variants and picks the top N (where N = `num_images` from session config).
+
+**How selection works:**
+1. All copy variants are scored using company profile learnings
+2. Best-performing angles (from `pipeline_learnings.best_performing_angles`) get highest priority
+3. Primary language variants get a bonus
+4. Creative hook strength (from creative spec) adds points
+5. Angle diversity is enforced — max 50% of budget to one angle
+
+**To get the selected variants, run:**
+```python
+python -c "
+from pipelines.marketing_creative.agent_utils import select_variants_for_generation
+import json
+selected = select_variants_for_generation('CAMPAIGN_ID', 'COMPANY')
+print(json.dumps(selected, indent=2))
+"
+```
+
+This returns a ranked list. Generate images ONLY for these selected variants.
+
+### Step 1: Load Selected Copy Variants
+
+For EACH selected variant:
 - **Creative:** e.g., CR-01 Trust Contrast
 - **Angle:** e.g., comparison
 - **Language:** e.g., hinglish
+- **Headline:** The exact headline text (use this in the image)
 
-Load the copy variant file. It contains:
-- Headline variants (3-5 options)
-- Body copy
-- CTA text
+Load the copy variant data from the copy manifest.
+
+### Step 1.5: Read Generation Config
+
+The session specifies:
+- **num_images**: TOTAL image budget across ALL creatives (default: 3)
+- **model**: Which provider to use (`flux_image`, `image_selector` auto-routing, or `auto`)
+
+If model is `auto`, use `image_selector` to pick the best provider.
+If model is specified, use that provider directly.
 
 ### Step 2: Read the Creative Spec for MOOD Only
 
@@ -137,17 +167,19 @@ Follow the Visual Brief formula from the meta skill:
 ```
 [Emotional contrast] +
 [Visual anchor 1] + [Visual anchor 2] +
-[Text overlays in locked language] +
+[Text overlays: use the HEADLINE from the selected copy variant — exact text, locked language] +
 [Mood words] +
 [Lighting] +
 [Camera/Technical: shot type, lens, aperture, film stock, depth of field]
 ```
 
+**Text Overlay Rule:** The image MUST include the copy variant's headline text. Not generic text in the same language — the EXACT headline from the copy variant file. The copy variant contains a single best headline (not multiple options). Use short, punchy phrases (telegram-style) — image models garble long sentences.
+
 **What to INCLUDE:**
 - Mood and atmosphere
 - Story contrast
 - 1-2 defining visual elements per side (not a full UI spec)
-- Text overlays in the LOCKED LANGUAGE (short phrases, telegram-style)
+- Text overlays using the EXACT HEADLINE from the selected copy variant, in the LOCKED LANGUAGE (short phrases, telegram-style)
 - Color palette direction with **hex codes or precise named colors**
 - Lighting style using **named lighting patterns** (golden hour, Rembrandt, rim, volumetric)
 - **Camera/Technical layer** (MANDATORY):
@@ -165,8 +197,6 @@ Follow the Visual Brief formula from the meta skill:
 - Gradient specifications
 - Full UI layouts
 - Every element from the creative spec
-
-**Token budget:** Keep the prompt under 400 tokens. The Camera/Technical layer adds ~40-80 tokens. Total should still be under 400.
 
 **Prompt structure tags (for verification):**
 When crafting the prompt, mentally verify that these sections are present:
@@ -191,8 +221,8 @@ Before calling any image generation tool, verify:
 
 - [ ] The prompt describes MOOD, not UI elements
 - [ ] The prompt has at most 2 visual anchors per side
-- [ ] Image text overlays match the copy variant language
-- [ ] The prompt is under 400 tokens
+- [ ] Image text overlays use the EXACT headline text from the selected copy variant
+- [ ] Image text overlays are in the correct language
 - [ ] No checklist/checkmark UI elements are specified
 - [ ] No specific fonts are requested
 - [ ] Emotional contrast is explicit in the prompt
@@ -210,29 +240,64 @@ Before calling any image generation tool, verify:
 
 **This is not optional. A failing prompt that proceeds anyway will be caught by Gate 3 and the pipeline will halt.**
 
-### Step 6: Generate the Image
+### Step 6: Generate the Image via Python Tools
 
-1. **Announce before execution** (Decision Communication Contract):
-   - Tool name: e.g., `openai_image`
-   - Provider: e.g., `openai`
-   - Model: e.g., `gpt-image-2`
-   - Reason chosen: e.g., "best text rendering reliability for Hinglish overlays"
-   - Sample or batch: sample (always sample first for new creative concepts)
+**IMPORTANT:** You do NOT use Claude Code built-in tools (`openai_image`, `google_imagen`, etc.). You run **Python scripts** that invoke OpenMontage tools.
 
-2. **Use `image_selector`** for automatic provider routing, or a concrete tool if the user has specified one.
+1. **Run preflight** to discover available providers:
+   ```bash
+   cd [OpenMontage root]
+   python -c "from tools.tool_registry import registry; registry.discover(); import json; print(json.dumps(registry.provider_menu_summary(), indent=2))"
+   ```
 
-3. **Parameters:**
+2. **Generate using `image_selector`** (auto-routes to best provider):
+   ```python
+   from tools.tool_registry import registry
+   registry.discover()
+
+   selector = registry.get("image_selector")
+   result = selector.execute({
+       "prompt": "[your optimized Visual Brief prompt]",
+       "width": 1024,      # 1024 for 1:1, 1280 for 4:5, 1024 for 9:16 (height=1792)
+       "height": 1024,
+       "output_path": "assets/cr01_pain_point_english.png",
+       "preferred_provider": "auto",  # or "flux", "openai", etc.
+   })
+   print(f"Success: {result.success}")
+   print(f"Output: {result.data.get('output')}")
+   print(f"Cost: ${result.cost_usd}")
+   ```
+
+3. **Or use a concrete provider directly** (e.g., FLUX):
+   ```python
+   from tools.tool_registry import registry
+   registry.discover()
+
+   flux = registry.get("flux_image")
+   result = flux.execute({
+       "prompt": "[your optimized prompt]",
+       "width": 1024,
+       "height": 1024,
+       "output_path": "assets/cr01_pain_point_english.png",
+       "model": "flux-pro/v1.1",
+   })
+   print(result)
+   ```
+
+4. **Parameters:**
    - Size: match the creative spec format (1:1 = 1024x1024, 9:16 = 1024x1792, 4:5 = 1024x1280)
    - Quality: `high` for production assets
    - Format: `png`
+   - API keys are loaded automatically from `.env`
 
-4. **Log the generation:**
+5. **Log the generation:**
    - Save prompt to `<asset_name>_prompt.md`
    - Save generation metadata to `<asset_name>.prompt.json` (tool, model, parameters, timestamp)
 
 ### Step 7: Post-Generation Verification
 
-**Language check:**
+**Language and text content check:**
+- [ ] Image text overlays use the EXACT headline text from the selected copy variant
 - [ ] Image text overlays are in the correct language
 - [ ] Copy variant language → matching image text language
 - [ ] All configured languages properly reflected in image text
@@ -279,8 +344,8 @@ Example:
       "id": "cr01-comparison-hinglish-v2",
       "type": "image",
       "path": "assets/cr01_comparison_hinglish_v2.png",
-      "source_tool": "openai_image",
-      "source_model": "gpt-image-2",
+      "source_tool": "image_selector",
+      "source_model": "flux-pro/v1.1",
       "creative_id": "CR-01",
       "angle": "comparison",
       "language": "hinglish",
@@ -324,7 +389,7 @@ Score (1-5):
 |-----------|----------|
 | **Language accuracy** | Does image text match the copy variant language? |
 | **Creative quality** | Is the image cinematic/emotional, not flat/infographic? |
-| **Prompt efficiency** | Is the prompt under 400 tokens and mood-driven? |
+| **Prompt efficiency** | Is the prompt mood-driven and efficiently written? |
 | **Spec alignment** | Does the image match the creative spec's emotional direction? |
 | **Budget adherence** | Is cost within the approved budget? |
 
@@ -333,9 +398,10 @@ If any dimension scores below 3, fix before proceeding.
 ## Common Pitfalls
 
 - **Skipping the meta skill:** The `image-prompt-from-copy-variant` skill is mandatory. Without it, you will over-specify prompts and produce flat ads.
-- **Wrong language in image text:** This is the #1 pipeline bug. Copy variant language must match image text language exactly. Always verify.
+- **Wrong text in image:** This is the #1 pipeline bug. The image MUST show the EXACT headline from the copy variant, not generic text in the same language. Always verify.
+- **Wrong language in image text:** Copy variant language must match image text language exactly. Always verify.
 - **Using wrong language for code-switched variants:** If the copy is in a code-switched language (e.g., Hinglish), the image text must also be in that same code-switched language. Do not fall back to pure English.
-- **Long text in images:** Image models garble long sentences. Use short, punchy phrases.
+- **Long text in images:** Image models garble long sentences. Use short, punchy phrases from the headline.
 - **Not versioning assets:** Always label v1, v2, etc. and deprecate old versions clearly.
 - **Generating without sample approval:** Always generate one sample first, verify it, then batch-generate remaining variants.
 

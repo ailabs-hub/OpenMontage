@@ -1,0 +1,43 @@
+{
+  "tool": "openai_image",
+  "tool_version": "0.1.0",
+  "provider": "openai",
+  "model": "gpt-image-2",
+  "generated_at_utc": "2026-05-11T12:46:59.748602+00:00",
+  "duration_seconds": 166.71,
+  "request": {
+    "user_prompt": "A cinematic premium advertisement, medium shot of a young Indian woman in her late 20s at center, hands near temples, overwhelmed expression, surrounded by four blurred glowing notification bubbles representing conflicting demands from Ex, Boss, Bank, and Parents. Behind her, a warm golden glow emanates from a floating Nadi palm leaf astrological chart with Sanskrit-like symbols, radiating calm and sacred clarity. Emotional contrast: chaotic cool-toned foreground with harsh overhead fluorescent shadows in deep blues and greys versus warm sacred background with soft golden-amber volumetric light in gold and cream. Text overlay at top: \"Everyone Has Opinions...\" Text overlay at center: \"But Who Gives Real Clarity?\" Text overlay at bottom: \"Get Your Nadi Report + 15 Mins FREE\" Shot on Sony A7IV with 35mm lens at f/2.8, shallow depth of field, cinematic color grading, Kodak Portra 400 film emulation. Photorealistic, premium spiritual advertising aesthetic, 4:5 aspect ratio.",
+    "size": "1024x1536",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1
+  },
+  "openai_revised_prompt": null,
+  "raw_response_metadata": {
+    "created": 1778503617,
+    "background": "opaque",
+    "output_format": "png",
+    "quality": "high",
+    "size": "1024x1536",
+    "usage": {
+      "input_tokens": 215,
+      "input_tokens_details": {
+        "image_tokens": 0,
+        "text_tokens": 215
+      },
+      "output_tokens": 5488,
+      "total_tokens": 5703,
+      "output_tokens_details": {
+        "image_tokens": 5488,
+        "text_tokens": 0
+      }
+    },
+    "data": [
+      {
+        "revised_prompt": null,
+        "url": null
+      }
+    ]
+  },
+  "image_path": "generated_image.png"
+}

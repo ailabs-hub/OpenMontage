@@ -18,6 +18,7 @@ extensions:
 
 required_skills:
   - pipelines/marketing-creative/executive-producer
+  - pipelines/marketing-creative/idea-refinement-director
   - pipelines/marketing-creative/research-director
   - pipelines/marketing-creative/creative-director
   - pipelines/marketing-creative/copy-director
@@ -28,7 +29,8 @@ required_skills:
   - meta/checkpoint-protocol
 
 orchestration:
-  mode: executive-producer
+  mode: code_orchestrator
+  script: pipelines/marketing_creative/orchestrator.py
   skill: pipelines/marketing-creative/executive-producer
   budget_default_usd: 5.00
   max_revisions_per_stage: 3
@@ -39,6 +41,30 @@ orchestration:
 
 stages:
   # ── Pre-Production ──────────────────────────────────────────────
+
+  - name: idea_refinement
+    skill: pipelines/marketing-creative/idea-refinement-director
+    produces:
+      - brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Raw input is converted into a structured idea file
+      - Company defaults are used where input is vague
+      - For image/URL inputs, reference analysis is included
+      - Idea file is written to the correct idea pool directory
+    success_criteria:
+      - Idea file exists in the idea pool with valid front matter
+      - Front matter includes id, title, status, source
+      - Body includes Core Concept, Target Platform, Target Audience, Primary Language
+    gate:
+      gate_id: gate-00-idea-refinement
+      required: true
+      validation_fields:
+        - idea_file_exists
+        - front_matter_valid
+        - body_sections_present
 
   - name: research
     skill: pipelines/marketing-creative/research-director
@@ -67,8 +93,6 @@ stages:
 
   - name: creative_concept
     skill: pipelines/marketing-creative/creative-director
-    required_artifacts_in:
-      - research_brief
     produces:
       - creative_specs
     tools_available: []
@@ -150,7 +174,7 @@ stages:
     human_approval_default: false
     review_focus:
       - "MANDATORY: meta skill image-prompt-from-copy-variant was read before any prompt was written"
-      - Image prompts use Visual Brief pattern (mood-driven, <400 tokens)
+      - Image prompts use Visual Brief pattern (mood-driven, with Camera/Technical layer)
       - Image text overlays match the copy variant language (copy language = image text language)
       - No checklist/checkmark UI elements in generated images
       - No specific fonts requested in prompts
@@ -173,7 +197,6 @@ stages:
         - prompt_has_camera_technical
         - prompt_has_shot_type
         - prompt_has_lighting_pattern
-        - prompt_under_400_tokens
         - files_generated
 
   # ── Post-Production ─────────────────────────────────────────────

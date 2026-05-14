@@ -1,0 +1,73 @@
+# Video composition engine (246MB)
+remotion-composer/
+
+# Video pipeline skills (not needed for marketing-creative)
+skills/pipelines/animation/
+skills/pipelines/avatar-spokesperson/
+skills/pipelines/character-animation/
+skills/pipelines/cinematic/
+skills/pipelines/clip-factory/
+skills/pipelines/documentary-montage/
+skills/pipelines/explainer/
+skills/pipelines/hybrid/
+skills/pipelines/localization-dub/
+skills/pipelines/podcast-repurpose/
+skills/pipelines/provider-benchmark/
+skills/pipelines/screen-demo/
+skills/pipelines/talking-head/
+
+# Video/animation Layer 3 skills
+.agents/skills/acestep/
+.agents/skills/ai-video-gen/
+.agents/skills/avatar-video/
+.agents/skills/canvas-procedural-animation/
+.agents/skills/character-animation-qa/
+.agents/skills/character-rigging/
+.agents/skills/create-video/
+.agents/skills/d3-viz/
+.agents/skills/doubao-tts/
+.agents/skills/elevenlabs/
+.agents/skills/elevenlabs-agents/
+.agents/skills/faceswap/
+.agents/skills/ffmpeg/
+.agents/skills/framer-motion/
+.agents/skills/grok-media/
+.agents/skills/gsap/
+.agents/skills/gsap-core/
+.agents/skills/gsap-frameworks/
+.agents/skills/gsap-performance/
+.agents/skills/gsap-plugins/
+.agents/skills/gsap-react/
+.agents/skills/gsap-scrolltrigger/
+.agents/skills/gsap-timeline/
+.agents/skills/gsap-utils/
+.agents/skills/heygen/
+.agents/skills/lottie-bodymovin/
+.agents/skills/manim-composer/
+.agents/skills/manimce-best-practices/
+.agents/skills/manimgl-best-practices/
+.agents/skills/music/
+.agents/skills/playwright-recording/
+.agents/skills/seedance-2-0/
+.agents/skills/sound-effects/
+.agents/skills/speech-to-text/
+.agents/skills/synthetic-screen-recording/
+.agents/skills/text-to-speech/
+.agents/skills/video-edit/
+.agents/skills/video-translate/
+.agents/skills/video-understand/
+.agents/skills/video_toolkit/
+.agents/skills/visual-style/
+
+# Generated media
+assets/
+projects/
+
+# Styles are video-specific
+styles/
+
+# Tests
+tests/
+
+# Agent guide trap — routing rules not needed for pipeline execution
+AGENT_GUIDE.md

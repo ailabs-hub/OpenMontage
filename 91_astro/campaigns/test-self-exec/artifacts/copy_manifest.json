@@ -1,0 +1,19 @@
+﻿{
+    "creatives":  [
+                      {
+                          "creative_name":  "Test",
+                          "angles":  {
+                                         "pain_point":  {
+                                                            "english":  "copy_variants/cr01_test/pain_point/english.md"
+                                                        }
+                                     },
+                          "creative_id":  "CR-01"
+                      }
+                  ],
+    "locked_language":  "english",
+    "version":  "1.0",
+    "total_variants":  1,
+    "languages":  [
+                      "english"
+                  ]
+}
